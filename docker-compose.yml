@@ -1,0 +1,20 @@
+version: '3.8'
+services:
+  postgres-Agenda:
+    image: postgres:15-alpine
+    container_name: agendaweb_db_container
+    restart: always
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: Admin2501
+      POSTGRES_DB: agendaweb
+    ports:
+      - "5433:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+
+volumes:
+
+  pgdata:
+    driver: local 
+

@@ -1,0 +1,13 @@
+#* Ingnorar Dependencias
+Backend/node_modules/
+
+
+
+#* Ignorar variables de entorno y credenciales
+Backend/.env
+
+#* Ignorar carpetas de compilacion 
+Backend/.agents/
+Backend/.claude/
+Backend/.cursor/
+Backend/.devin/

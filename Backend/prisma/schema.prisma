@@ -1,0 +1,141 @@
+generator client {
+    provider = "prisma-client-js"
+}
+
+datasource db {
+    provider = "postgresql"
+    url      =   env("DATABASE_URL")
+}
+
+enum Role {
+    ADMIN
+    BARBER_BOSS
+    BARBER_AFFILIATE
+    BARBER_INDEPENDENT
+}
+
+enum AppointmentState {
+    PENDING
+    CONFIRMED
+    COMPLETED
+    CANCELLED
+}
+
+enum DayOfWeek{
+    MONDAY
+    TUESDAY
+    WEDNESDAY
+    THURSDAY
+    FRIDAY
+    SATURDAY
+    SUNDAY
+}
+
+model User {
+    id String @id @default(uuid())
+    name String
+    phone String  @unique
+    password String
+    role Role 
+    photo String
+    state Boolean @default(true) //* Estado activo por defecto
+    description String
+    createdAt DateTime @default(now())
+    updatedAt DateTime @updatedAt
+    haveWhatsApp Boolean @default(true) // para enviar mensaje de recuperar contraseña por si se le olvida y si no tiene por mensaje de texto
+
+    businessHours BusinessHour[]
+
+    //? Relations
+    appointmentBarber Appointment[]  @relation("AppointmentBarber")
+    historyAppointment HistoryAppointment[]
+    services ServicesBarbers[]
+
+    //? lock
+    failedAttempts Int @default(0)
+    lockUntil DateTime?
+}
+
+
+model Services {
+    id String @id @default(uuid())
+    name String
+    description String
+    duration Int
+    price Float
+    createdAt DateTime @default(now())
+    updatedAt DateTime @updatedAt
+
+    //? Relations
+    barbers ServicesBarbers[]
+    appointment Appointment[]
+    historyAppointment HistoryAppointment[]
+}
+
+
+model ServicesBarbers {
+    barberId String
+    serviceId String
+    barber User @relation(fields: [barberId], references: [id], onDelete: Cascade)
+    service Services @relation(fields: [serviceId], references: [id], onDelete: Cascade)
+
+    @@id([barberId, serviceId])
+}
+
+model Appointment { // esta seria la tabla de la reserva de cliente 
+    id String @id @default(uuid())
+    name String
+    phone String
+    date DateTime
+    state AppointmentState @default(PENDING)
+    timeSlot String
+
+    clientId String
+    client Clients @relation(fields: [clientId], references: [id], onDelete: Cascade)
+
+    barberId String
+    barber User @relation("AppointmentBarber", fields: [barberId], references: [id], onDelete: Cascade)
+    
+    serviceId String
+    service Services @relation(fields: [serviceId], references: [id], onDelete: Cascade)
+
+
+    createdAt DateTime  @default(now())
+    updatedAt DateTime @updatedAt
+    historyAppointment HistoryAppointment[]
+}
+
+model Clients {
+    id String @id @default(uuid())
+    name String
+    phone String
+    appointments Appointment[]
+    haveWhatsApp Boolean @default(true) // para enviar mensaje de cita reservado con exito y si no tiene por mensaje de texto
+}
+
+
+model BusinessHour  {
+    id String @id @default(uuid())
+    day DayOfWeek
+    timeSlot String
+    isActive Boolean  @default(true)
+
+    barberId String
+    barber User @relation(fields: [barberId], references: [id])
+
+    @@unique([barberId, day, timeSlot])
+}
+
+model HistoryAppointment {
+    id  String @id @default(uuid())
+    state AppointmentState 
+
+    barberId String
+    barber User @relation(fields: [barberId], references: [id], onDelete: Cascade)
+
+    appointmentId String
+    appointment Appointment @relation(fields: [appointmentId], references: [id], onDelete: Cascade)
+
+    serviceId String
+    service Services @relation(fields: [serviceId], references: [id], onDelete: Cascade)
+}
