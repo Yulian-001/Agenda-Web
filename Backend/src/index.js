@@ -1,15 +1,15 @@
-import express, { Request, Response } from 'express';
+import express from 'express';
 import cors from 'cors';
 import dotenv from 'dotenv';
 import helmet from 'helmet';
 import morgan from 'morgan';
 import ratelimit from 'express-rate-limit';
-
+import healthRoutes from '../src/routes/AuthRoutes.js'
 //? variables de entorno .env
 
 dotenv.config()
 
-const app = expres();
+const app = express();
 const PORT = process.env.PORT || 3000;
 
 
@@ -33,10 +33,11 @@ app.use(helmet());
 app.use(morgan());
 app.use(lmt);
 app.use(express.json());
-app.use('/api/auth', authRoutes);
+app.use('/api', healthRoutes);
 
-app.get('/api/health',(req, res)=> {
-    res.json({status: 'SANO', message: 'Servidor corriendo correctamente.'})
-});
 
-//? Ruta de prueba protegida 
+//? Iniciar servidor
+
+app.listen(PORT,() => {
+    console.log(`Servido corriendo en ${PORT}`);
+})
