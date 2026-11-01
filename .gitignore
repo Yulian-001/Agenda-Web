@@ -1,10 +1,13 @@
 #* Ingnorar Dependencias
-Backend/node_modules/
+node_modules/
 
 
 
 #* Ignorar variables de entorno y credenciales
-Backend/.env
+.env
+.env.*
+dist/
+build/
 
 #* Ignorar carpetas de compilacion 
 Backend/.agents/
