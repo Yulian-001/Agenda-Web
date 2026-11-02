@@ -1,5 +1,5 @@
-import { prisma } from '@prisma/client';
-import  bcrypt  from 'bcryptjs';
+import prisma from '../config/prisma.js';
+import  bcrypt  from 'bcrypt';
 import jwt from 'jsonwebtoken';
 
 
@@ -13,6 +13,8 @@ export const checkServerHealth = () => {
 }
 
 //* Función para registrar un nuevo usuario 
+
+
 export const createUserService = async ({name,phone,password,role,photo,state,description,haveWhatsApp,services}) => {
     const validPayload =( {name,phone,password,role,photo,state,description,haveWhatsApp,services}) => {
         //* Regex de contraseña */
@@ -60,6 +62,18 @@ export const createUserService = async ({name,phone,password,role,photo,state,de
             throw new Error('Debe ingresar si tiene o no WhatsApp');
         }
     }
+
+    validPayload({name,phone,password,role,photo,state,description,haveWhatsApp,services});
+
+    //* Identificar si el usuario ya existe
+
+    const existingUser = prisma.findUnique(phone)
+
+    if(existingUser){
+        throw new Error('Este usuario ya se encuentra registrado');
+    }
+
+
 
 
 }

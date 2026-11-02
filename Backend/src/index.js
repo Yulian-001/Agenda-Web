@@ -4,7 +4,9 @@ import dotenv from 'dotenv';
 import helmet from 'helmet';
 import morgan from 'morgan';
 import ratelimit from 'express-rate-limit';
-import healthRoutes from '../src/routes/AuthRoutes.js'
+import healthRoutes from '../src/routes/AuthRoutes.js';
+
+
 //? variables de entorno .env
 
 dotenv.config()
@@ -34,6 +36,7 @@ app.use(morgan());
 app.use(lmt);
 app.use(express.json());
 app.use('/api', healthRoutes);
+
 
 
 //? Iniciar servidor
