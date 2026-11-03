@@ -1,3 +1,4 @@
+import { Role } from '@prisma/client';
 import prisma from '../config/prisma.js';
 import  bcrypt  from 'bcrypt';
 import jwt from 'jsonwebtoken';
@@ -40,7 +41,7 @@ export const createUserService = async ({name,phone,password,role,photo,state,de
             throw new Error('Debe seleccionar al menos un servicio',)
         }
 
-        const permitRoles = Object.values(prisma._engineConfig?.inlineSchemaObject?.enumMap?.Role || {});
+        const permitRoles = Object.values(Role);
 
         if(!role){
             throw new Error('Debe seleccionar un rol para continuar');
@@ -65,9 +66,18 @@ export const createUserService = async ({name,phone,password,role,photo,state,de
 
     validPayload({name,phone,password,role,photo,state,description,haveWhatsApp,services});
 
+    //* limpiar payload para almacenar datos
+    const cleanPayload = {name,phone,password,role,photo,state,description,haveWhatsApp,services} => {
+
+
+
+        
+        
+    }
+
     //* Identificar si el usuario ya existe
 
-    const existingUser = prisma.findUnique(phone)
+    const existingUser = await prisma.user.findUnique({where: {phone: phone}})
 
     if(existingUser){
         throw new Error('Este usuario ya se encuentra registrado');
