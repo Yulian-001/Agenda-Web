@@ -1,0 +1,34 @@
+services:
+  db:
+    image: postgres:15-alpine
+    container_name: agendaweb_db_container
+    restart: always
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: Admin2501
+      POSTGRES_DB: agendaweb
+    ports:
+      - "5433:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      args:
+        # Para construir la app, Next necesita la URL de la BD.
+        # Apuntamos al puerto interno (5432) y al nombre del servicio (db)
+        DATABASE_URL: postgresql://postgres:Admin2501@db:5432/agendaweb?schema=public
+    container_name: agendaweb_next_container
+    restart: always
+    ports:
+      - "3000:3000"
+    environment:
+      # Para cuando la app esté corriendo en producción
+      DATABASE_URL: postgresql://postgres:Admin2501@db:5432/agendaweb?schema=public
+    depends_on:
+      - db
+
+volumes:
+  pgdata:
