@@ -1,14 +1,19 @@
 // app/api/services/route.js
 import { NextResponse } from 'next/server';
-import { serviceSchema } from '../../../utils/validations'; // Ojo: 3 niveles hacia atrás
-import { createServiceService } from '../../../services/service.service'; // Ojo: 3 niveles
+import { verifyAuth } from '../../../utils/auth';
+import { serviceSchema } from '../../../utils/validations';
+import { createServiceService, getServicesService } from '../../../services/service.service'; 
+
 
 export async function POST(request) {
     try {
-        const body = await request.json();
+        // ROLES PERMITIDOS
+        await verifyAuth(['ADMIN', 'BARBER_BOSS', 'BARBER_INDEPENDENT']);
 
-        // 1. Validar y limpiar datos con Zod
+        // 2. Validar datos con Zod
+        const body = await request.json();
         const validation = serviceSchema.safeParse(body);
+
         if (!validation.success) {
             return NextResponse.json({
                 error: "Datos del servicio inválidos",
@@ -16,10 +21,9 @@ export async function POST(request) {
             }, { status: 400 });
         }
 
-        // 2. Llamar a la capa de servicio
+        // 3. Crear el servicio
         const newService = await createServiceService(validation.data);
 
-        // 3. Responder con 201 Created
         return NextResponse.json({
             message: "Servicio creado exitosamente",
             service: newService
@@ -28,10 +32,27 @@ export async function POST(request) {
     } catch (error) {
         console.error("Error al crear servicio:", error);
 
+        // Manejo de errores de la base de datos
         if (error.statusCode) {
             return NextResponse.json({ error: error.message }, { status: error.statusCode });
         }
 
+        return NextResponse.json({ error: "Error interno del servidor" }, { status: 500 });
+    }
+}
+
+export async function GET() {
+    try {
+        const services = await getServicesService();
+
+        return NextResponse.json({
+            message: "Servicios obtenidos exitosamente",
+            count: services.length,
+            services
+        }, { status: 200 });
+
+    } catch (error) {
+        console.error("Error al listar servicios:", error);
         return NextResponse.json({ error: "Error interno del servidor" }, { status: 500 });
     }
 }

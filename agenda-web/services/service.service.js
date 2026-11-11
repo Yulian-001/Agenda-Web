@@ -19,3 +19,14 @@ export const createServiceService = async (data) => {
 
     return newService;
 };
+
+
+export const getServicesService = async () => {
+    // Traemos solo los servicios que no han sido eliminados lógicamente
+    const services = await prisma.services.findMany({
+        where: { isActive: true },
+        orderBy: { name: 'asc' } // Ordenados alfabéticamente
+    });
+
+    return services;
+};
