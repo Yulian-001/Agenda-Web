@@ -1,4 +1,6 @@
-// app/api/test/route.js
+//? app/api/test/route.js
+
+
 import { NextResponse } from 'next/server';
 import { prisma } from '@/utils/prisma';
 
