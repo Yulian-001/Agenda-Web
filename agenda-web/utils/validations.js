@@ -19,10 +19,6 @@ export const registerSchema = z.object({
     services: z.array(z.string().uuid("ID de servicio inválido")).min(1, "Debe seleccionar al menos un servicio")
 });
 
-
-// utils/validations.js
-// ... (tu registerSchema de usuario)
-
 export const serviceSchema = z.object({
     name: z.string().min(3, "Mínimo 3 caracteres").trim(),
     description: z.string().min(10, "Mínimo 10 caracteres").trim(),
