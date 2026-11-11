@@ -2,7 +2,7 @@
 import { NextResponse } from 'next/server';
 import bcrypt from 'bcryptjs';
 import { z } from 'zod';
-import { prisma } from '@/utils/prisma';
+import { prisma } from '../../../../utils/prisma';
 
 // Esquema de validación con Zod
 const loginSchema = z.object({
