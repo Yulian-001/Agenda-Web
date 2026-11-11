@@ -1,6 +1,8 @@
 // services/auth.service.js
 import bcrypt from 'bcryptjs';
-import { prisma } from '@/utils/prisma';
+import { prisma } from '../utils/prisma';
+
+
 
 export const createUserService = async (data) => {
     const { name, phone, password, role, photo, description, haveWhatsApp, services } = data;
