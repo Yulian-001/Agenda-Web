@@ -1,6 +1,8 @@
 // utils/validations.js
 import { z } from 'zod';
 import { Role } from '@prisma/client';
+import { DayOfWeek } from '@prisma/client';
+
 
 export const registerSchema = z.object({
     name: z.string().min(2, "El nombre debe tener al menos 2 caracteres").trim(),
@@ -27,3 +29,14 @@ export const serviceSchema = z.object({
 });
 
 export const updateServiceSchema = serviceSchema.partial();
+
+export const toggleDaySchema = z.object({
+    day: z.nativeEnum(DayOfWeek, { errorMap: () => ({ message: "Día inválido" }) }),
+    isActive: z.boolean()
+});
+
+export const toggleHourSchema = z.object({
+    day: z.nativeEnum(DayOfWeek, { errorMap: () => ({ message: "Día inválido" }) }),
+    timeSlot: z.string().regex(/^([0-1]?[0-9]|2[0-3]):[0-5][0-9]$/, "Formato de hora inválido (HH:MM)"),
+    isActive: z.boolean()
+});
