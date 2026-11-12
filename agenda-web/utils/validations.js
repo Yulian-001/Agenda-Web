@@ -25,3 +25,5 @@ export const serviceSchema = z.object({
     duration: z.number().int("Debe ser entero").positive("Debe ser mayor a 0"),
     price: z.number().positive("El precio debe ser mayor a 0")
 });
+
+export const updateServiceSchema = serviceSchema.partial();
