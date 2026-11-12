@@ -30,3 +30,31 @@ export const getServicesService = async () => {
 
     return services;
 };
+
+export const updateServiceService = async (id, data) => {
+    const service = await prisma.services.findUnique({ where: { id } });
+    if (!service) throw { statusCode: 404, message: 'Servicio no encontrado' };
+
+    if (data.name && data.name !== service.name) {
+        const existing = await prisma.services.findFirst({
+            where: { name: { equals: data.name, mode: 'insensitive' } }
+        });
+        if (existing) throw { statusCode: 409, message: 'Ya existe otro servicio con ese nombre' };
+    }
+
+    return await prisma.services.update({
+        where: { id },
+        data
+    });
+};
+
+export const deleteServiceService = async (id) => {
+    const service = await prisma.services.findUnique({ where: { id } });
+    if (!service) throw { statusCode: 404, message: 'Servicio no encontrado' };
+
+    // Soft delete: solo desactivamos el servicio
+    return await prisma.services.update({
+        where: { id },
+        data: { isActive: false }
+    });
+};
