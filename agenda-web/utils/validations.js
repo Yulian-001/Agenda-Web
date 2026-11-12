@@ -1,7 +1,6 @@
 // utils/validations.js
 import { z } from 'zod';
-import { Role } from '@prisma/client';
-import { DayOfWeek } from '@prisma/client';
+import { Role, DayOfWeek } from '@prisma/client';
 
 
 export const registerSchema = z.object({
@@ -39,4 +38,14 @@ export const toggleHourSchema = z.object({
     day: z.nativeEnum(DayOfWeek, { errorMap: () => ({ message: "Día inválido" }) }),
     timeSlot: z.string().regex(/^([0-1]?[0-9]|2[0-3]):[0-5][0-9]$/, "Formato de hora inválido (HH:MM)"),
     isActive: z.boolean()
+});
+
+
+export const createAppointmentSchema = z.object({
+    clientName: z.string().min(2, "El nombre es requerido").trim(),
+    clientPhone: z.string().length(10, "El teléfono debe tener 10 dígitos").trim(),
+    barberId: z.string().uuid("ID de barbero inválido"),
+    serviceId: z.string().uuid("ID de servicio inválido"),
+    date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Formato de fecha inválido (YYYY-MM-DD)"),
+    timeSlot: z.string().regex(/^([0-1]?[0-9]|2[0-3]):[0-5][0-9]$/, "Formato de hora inválido (HH:MM)")
 });
