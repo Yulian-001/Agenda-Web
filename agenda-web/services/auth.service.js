@@ -151,3 +151,49 @@ export const resetPasswordService = async (phone, otpCode, newPassword) => {
 
     return { message: "Contraseña actualizada exitosamente" };
 };
+
+
+// 1. NUEVA FUNCIÓN: Crear un Barbero desde el Panel de Admin
+export const createBarberService = async (data) => {
+    const { name, phone, password, role, photo, description, haveWhatsApp } = data;
+
+    const existingUser = await prisma.user.findUnique({ where: { phone } });
+    if (existingUser) throw { statusCode: 409, message: 'Este número de teléfono ya está registrado' };
+
+    const hashedPassword = await bcrypt.hash(password, 10);
+
+    return await prisma.user.create({
+        data: {
+            name: name.trim(),
+            phone: phone.trim(),
+            password: hashedPassword,
+            role,
+            photo,
+            description,
+            haveWhatsApp,
+        },
+        select: { id: true, name: true, phone: true, role: true, createdAt: true }
+    });
+};
+
+// 2. NUEVA FUNCIÓN: Eliminar Definitivo (Solo si no tiene citas pendientes)
+export const hardDeleteUserService = async (id) => {
+    const user = await prisma.user.findUnique({ where: { id } });
+    if (!user) throw { statusCode: 404, message: 'Usuario no encontrado' };
+
+    // Validamos que no tenga citas futuras antes de borrar de la BD
+    const futureAppointments = await prisma.appointment.count({
+        where: {
+            barberId: id,
+            date: { gte: new Date() },
+            state: { in: ['PENDING', 'CONFIRMED'] }
+        }
+    });
+
+    if (futureAppointments > 0) {
+        throw { statusCode: 400, message: `No se puede eliminar porque tiene ${futureAppointments} citas pendientes.` };
+    }
+
+    // Si no hay citas, lo borramos de verdad (Hard Delete)
+    return await prisma.user.delete({ where: { id } });
+};

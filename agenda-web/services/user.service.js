@@ -6,7 +6,7 @@ export const getBarbersService = async () => {
     return await prisma.user.findMany({
         where: {
             role: { in: ['ADMIN', 'BARBER_BOSS', 'BARBER_AFFILIATE', 'BARBER_INDEPENDENT'] },
-            state: true // Solo los activos
+            // ❌ ELIMINADO: state: true (Ahora traemos a todos, activos e inactivos)
         },
         select: {
             id: true,
@@ -16,6 +16,7 @@ export const getBarbersService = async () => {
             role: true,
             description: true,
             commissionRate: true,
+            state: true, // ✅ AGREGADO: Necesitamos el estado para pintar el badge en el Frontend
             services: {
                 select: {
                     service: { select: { id: true, name: true } }
@@ -51,12 +52,11 @@ export const updateBarberService = async (id, data) => {
     });
 };
 
-
 export const deleteUserService = async (id) => {
     const user = await prisma.user.findUnique({ where: { id } });
     if (!user) throw { statusCode: 404, message: 'Usuario no encontrado' };
 
-    //  Evitar desactivar si tiene citas futuras
+    // 🛡️ Evitar desactivar si tiene citas futuras (Lógica intacta)
     const futureAppointments = await prisma.appointment.count({
         where: {
             barberId: id,
@@ -66,13 +66,13 @@ export const deleteUserService = async (id) => {
     });
 
     if (futureAppointments > 0) {
-        throw { 
-            statusCode: 400, 
-            message: `No se puede desactivar al barbero porque tiene ${futureAppointments} citas pendientes. Cancele o reasigne primero.` 
+        throw {
+            statusCode: 400,
+            message: `No se puede desactivar al barbero porque tiene ${futureAppointments} citas pendientes. Cancele o reasigne primero.`
         };
     }
 
-    // Si pasa, hacemos el Soft Delete
+    // Si pasa, hacemos el Soft Delete (Lógica intacta)
     return await prisma.user.update({
         where: { id },
         data: { state: false }

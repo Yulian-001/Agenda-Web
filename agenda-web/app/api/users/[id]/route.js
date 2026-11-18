@@ -1,31 +1,27 @@
 // app/api/users/[id]/route.js
 import { NextResponse } from 'next/server';
 import { verifyAuth } from '../../../../utils/auth';
-import { updateBarberService, deleteUserService } from '../../../../services/user.service';
+import { updateBarberService, hardDeleteUserService } from '../../../../services/user.service'; 
 import { updateUserSchema } from '../../../../utils/validations';
 import { handleApiError } from '../../../../utils/errorHandler'; 
 
-// PUT: Actualizar usuario
+// PUT: Actualizar usuario (incluye activar/desactivar)
 export async function PUT(request, { params }) {
     try {
         const resolvedParams = await params;
         const { id } = resolvedParams;
 
         const payload = await verifyAuth();
-
         const isAdminOrBoss = ['ADMIN', 'BARBER_BOSS'].includes(payload.role);
         const isSelf = payload.id === id;
 
         if (!isAdminOrBoss && !isSelf) {
-            return NextResponse.json({
-                error: "Acceso denegado. No puedes modificar el perfil de otro usuario."
-            }, { status: 403 });
+            return NextResponse.json({ error: "Acceso denegado." }, { status: 403 });
         }
 
         const body = await request.json();
-
-        // Validación estricta con Zod
         const validation = updateUserSchema.safeParse(body);
+        
         if (!validation.success) {
             return NextResponse.json({ error: "Datos inválidos", details: validation.error.format() }, { status: 400 });
         }
@@ -42,30 +38,31 @@ export async function PUT(request, { params }) {
     }
 }
 
-// DELETE: Soft Delete (Desactivar usuario)
+// DELETE: Eliminación Definitiva (Hard Delete)
 export async function DELETE(request, { params }) {
     try {
         const payload = await verifyAuth();
         const resolvedParams = await params;
         const { id } = resolvedParams;
 
-        // Solo el Admin o el Boss pueden "eliminar" (desactivar) a otros usuarios
+        // Solo el Admin o el Boss pueden eliminar definitivamente
         const isAdminOrBoss = ['ADMIN', 'BARBER_BOSS'].includes(payload.role);
         if (!isAdminOrBoss) {
             return NextResponse.json({
-                error: "Acceso denegado. Solo un administrador puede desactivar usuarios."
+                error: "Acceso denegado. Solo un administrador puede eliminar usuarios."
             }, { status: 403 });
         }
 
-        // Evitar que un Admin se desactive a sí mismo por error
+        // Evitar que un Admin se elimine a sí mismo
         if (payload.id === id) {
-            return NextResponse.json({ error: "No puedes desactivar tu propia cuenta." }, { status: 400 });
+            return NextResponse.json({ error: "No puedes eliminar tu propia cuenta." }, { status: 400 });
         }
 
-        await deleteUserService(id);
+        // Llamamos a la función de eliminación definitiva (valida citas pendientes)
+        await hardDeleteUserService(id);
 
         return NextResponse.json({
-            message: "Usuario desactivado exitosamente. Ya no podrá iniciar sesión."
+            message: "Usuario eliminado definitivamente del sistema."
         }, { status: 200 });
 
     } catch (error) {

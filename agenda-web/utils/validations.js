@@ -51,6 +51,7 @@ export const createAppointmentSchema = z.object({
 });
 
 // Agregar al final de utils/validations.js
+// utils/validations.js
 export const updateUserSchema = z.object({
     name: z.string().min(2).trim().optional(),
     photo: z.string().url("Debe ser una URL válida").optional(),
@@ -58,7 +59,8 @@ export const updateUserSchema = z.object({
     haveWhatsApp: z.boolean().optional(),
     commissionRate: z.number().min(0).max(1).optional(),
     services: z.array(z.string().uuid()).optional(),
-    state: z.boolean().optional() // Para el Soft Delete
+    state: z.boolean().optional(), // Para el Soft Delete
+    role: z.nativeEnum(Role).optional() 
 });
 
 export const forgotPasswordSchema = z.object({
