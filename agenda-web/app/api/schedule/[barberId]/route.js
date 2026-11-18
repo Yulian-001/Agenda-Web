@@ -7,6 +7,7 @@ import {
     toggleHourService
 } from '../../../../services/schedule.service';
 import { toggleDaySchema, toggleHourSchema } from '../../../../utils/validations';
+import { prisma } from '../../../../utils/prisma';
 
 export async function GET(request, { params }) {
     try {
@@ -55,6 +56,47 @@ export async function PUT(request, { params }) {
             return NextResponse.json({ message: `Día ${body.day} actualizado.` }, { status: 200 });
         }
 
+    } catch (error) {
+        if (error.statusCode) return NextResponse.json({ error: error.message }, { status: error.statusCode });
+        return NextResponse.json({ error: "Error interno" }, { status: 500 });
+    }
+}
+
+
+export async function POST(request, { params }) {
+    try {
+        // Solo Admin o Boss pueden generar la agenda base
+        await verifyAuth(['ADMIN', 'BARBER_BOSS']);
+
+        const resolvedParams = await params;
+        const { barberId } = resolvedParams;
+
+        const days = ['TUESDAY', 'WEDNESDAY', 'THURSDAY', 'FRIDAY', 'SATURDAY', 'SUNDAY'];
+        const hours = [
+            "08:00", "09:00", "10:00", "11:00", "12:00",
+            "14:00", "15:00", "16:00", "17:00", "18:00", "19:00", "20:00", "21:00", "22:00"
+        ];
+
+        const dataToInsert = [];
+
+        for (const day of days) {
+            for (const timeSlot of hours) {
+                dataToInsert.push({
+                    barberId,
+                    day,
+                    timeSlot,
+                    isActive: true
+                });
+            }
+        }
+
+        // Insertamos en la base de datos
+        await prisma.businessHour.createMany({
+            data: dataToInsert,
+            skipDuplicates: true // Evita errores si ya existen
+        });
+
+        return NextResponse.json({ message: "Agenda por defecto generada exitosamente" }, { status: 201 });
     } catch (error) {
         if (error.statusCode) return NextResponse.json({ error: error.message }, { status: error.statusCode });
         return NextResponse.json({ error: "Error interno" }, { status: 500 });
