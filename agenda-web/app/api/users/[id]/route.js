@@ -1,32 +1,36 @@
 // app/api/users/[id]/route.js
 import { NextResponse } from 'next/server';
 import { verifyAuth } from '../../../../utils/auth';
-import { updateBarberService } from '../../../../services/user.service';
+import { updateBarberService, deleteUserService } from '../../../../services/user.service';
+import { updateUserSchema } from '../../../../utils/validations';
+import { handleApiError } from '../../../../utils/errorHandler'; 
 
+// PUT: Actualizar usuario
 export async function PUT(request, { params }) {
     try {
         const resolvedParams = await params;
         const { id } = resolvedParams;
 
-        // 1. Validamos que esté logueado (sin restringir rol aún)
         const payload = await verifyAuth();
 
-        // 2. Lógica RBAC: ¿Quién puede editar a quién?
         const isAdminOrBoss = ['ADMIN', 'BARBER_BOSS'].includes(payload.role);
         const isSelf = payload.id === id;
 
-        // Si NO es admin/boss Y NO es él mismo, rebotamos la petición.
         if (!isAdminOrBoss && !isSelf) {
             return NextResponse.json({
                 error: "Acceso denegado. No puedes modificar el perfil de otro usuario."
             }, { status: 403 });
         }
 
-        // Opcional: Si es un afiliado, podríamos restringirle qué campos puede editar.
-        // (Por ahora, lo dejamos editar su foto/descripcion, pero los horarios los bloquearemos en su propio endpoint)
-
         const body = await request.json();
-        const updated = await updateBarberService(id, body);
+
+        // Validación estricta con Zod
+        const validation = updateUserSchema.safeParse(body);
+        if (!validation.success) {
+            return NextResponse.json({ error: "Datos inválidos", details: validation.error.format() }, { status: 400 });
+        }
+
+        const updated = await updateBarberService(id, validation.data);
 
         return NextResponse.json({
             message: "Barbero actualizado exitosamente",
@@ -34,7 +38,37 @@ export async function PUT(request, { params }) {
         }, { status: 200 });
 
     } catch (error) {
-        if (error.statusCode) return NextResponse.json({ error: error.message }, { status: error.statusCode });
-        return NextResponse.json({ error: "Error interno" }, { status: 500 });
+        return handleApiError(error, "Error en PUT user");
+    }
+}
+
+// DELETE: Soft Delete (Desactivar usuario)
+export async function DELETE(request, { params }) {
+    try {
+        const payload = await verifyAuth();
+        const resolvedParams = await params;
+        const { id } = resolvedParams;
+
+        // Solo el Admin o el Boss pueden "eliminar" (desactivar) a otros usuarios
+        const isAdminOrBoss = ['ADMIN', 'BARBER_BOSS'].includes(payload.role);
+        if (!isAdminOrBoss) {
+            return NextResponse.json({
+                error: "Acceso denegado. Solo un administrador puede desactivar usuarios."
+            }, { status: 403 });
+        }
+
+        // Evitar que un Admin se desactive a sí mismo por error
+        if (payload.id === id) {
+            return NextResponse.json({ error: "No puedes desactivar tu propia cuenta." }, { status: 400 });
+        }
+
+        await deleteUserService(id);
+
+        return NextResponse.json({
+            message: "Usuario desactivado exitosamente. Ya no podrá iniciar sesión."
+        }, { status: 200 });
+
+    } catch (error) {
+        return handleApiError(error, "Error en DELETE user");
     }
 }

@@ -50,3 +50,14 @@ export const updateBarberService = async (id, data) => {
         data: updateData
     });
 };
+
+
+export const deleteUserService = async (id) => {
+    const user = await prisma.user.findUnique({ where: { id } });
+    if (!user) throw { statusCode: 404, message: 'Usuario no encontrado' };
+
+    return await prisma.user.update({
+        where: { id },
+        data: { state: false }
+    });
+};
