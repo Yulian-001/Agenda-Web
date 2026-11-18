@@ -108,3 +108,49 @@ export const loginUserService = async (phone, password) => {
         }
     };
 };
+
+export const generateOTPService = async (phone) => {
+    const user = await prisma.user.findUnique({ where: { phone } });
+    if (!user) throw { statusCode: 404, message: 'Teléfono no registrado' };
+
+    const otpCode = Math.floor(100000 + Math.random() * 900000).toString();
+    const expiresAt = new Date(Date.now() + 15 * 60 * 1000); // 15 minutos
+
+    // Limpiamos tokens anteriores no usados de este teléfono
+    await prisma.passwordResetToken.deleteMany({ where: { phone, used: false } });
+
+    await prisma.passwordResetToken.create({
+        data: { phone, otpCode, expiresAt }
+    });
+
+    //  SIMULACIÓN DE WHATSAPP/SMS
+    console.log(`\n=========================================`);
+    console.log(`📱 OTP PARA ${phone}: [ ${otpCode} ]`);
+    console.log(`=========================================\n`);
+
+    return { message: "Código de recuperación enviado" };
+};
+
+export const resetPasswordService = async (phone, otpCode, newPassword) => {
+    const token = await prisma.passwordResetToken.findFirst({
+        where: { phone, otpCode, used: false, expiresAt: { gte: new Date() } }
+    });
+
+    if (!token) throw { statusCode: 400, message: 'Código inválido o expirado' };
+
+    const hashedPassword = await bcrypt.hash(newPassword, 10);
+
+    // Actualizamos la contraseña y marcamos el token como usado
+    await prisma.$transaction([
+        prisma.user.update({
+            where: { phone },
+            data: { password: hashedPassword, failedAttempts: 0, lockUntil: null }
+        }),
+        prisma.passwordResetToken.update({
+            where: { id: token.id },
+            data: { used: true }
+        })
+    ]);
+
+    return { message: "Contraseña actualizada exitosamente" };
+};

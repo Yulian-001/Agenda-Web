@@ -49,3 +49,27 @@ export const createAppointmentSchema = z.object({
     date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Formato de fecha inválido (YYYY-MM-DD)"),
     timeSlot: z.string().regex(/^([0-1]?[0-9]|2[0-3]):[0-5][0-9]$/, "Formato de hora inválido (HH:MM)")
 });
+
+// Agregar al final de utils/validations.js
+export const updateUserSchema = z.object({
+    name: z.string().min(2).trim().optional(),
+    photo: z.string().url("Debe ser una URL válida").optional(),
+    description: z.string().min(5).trim().optional(),
+    haveWhatsApp: z.boolean().optional(),
+    commissionRate: z.number().min(0).max(1).optional(),
+    services: z.array(z.string().uuid()).optional(),
+    state: z.boolean().optional() // Para el Soft Delete
+});
+
+export const forgotPasswordSchema = z.object({
+    phone: z.string().length(10, "El teléfono debe tener 10 dígitos")
+});
+
+export const resetPasswordSchema = z.object({
+    phone: z.string().length(10),
+    otpCode: z.string().length(6, "El código debe tener 6 dígitos"),
+    newPassword: z.string().regex(
+        /^(?=.*[a-z])(?=.*[A-Z])(?=.*[!#$%&/(){}*+<>]).{8,}$/,
+        "Contraseña débil: debe incluir mayúsculas, minúsculas y un carácter especial"
+    )
+});

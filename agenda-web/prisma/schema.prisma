@@ -42,12 +42,10 @@ model User {
     description String
     haveWhatsApp Boolean @default(true)
     
-    // Gestión de comisiones (Ej: 0.70 = 70% para el barbero)
     commissionRate Float @default(0.70) 
     
-    // Seguridad
     failedAttempts Int @default(0)
-    lockUntil DateTime ?
+    lockUntil DateTime?
     
     createdAt DateTime @default(now())
     updatedAt DateTime @updatedAt
@@ -62,9 +60,9 @@ model Services {
     id String @id @default(uuid())
     name String
     description String
-    duration Int // En minutos
+    duration Int 
     price Float
-    isActive Boolean @default(true) // Borrado lógico, no eliminamos el servicio
+    isActive Boolean @default(true) 
     
     createdAt DateTime @default(now())
     updatedAt DateTime @updatedAt
@@ -86,14 +84,12 @@ model ServicesBarbers {
 model Appointment {
     id String @id @default(uuid())
     date DateTime
-    timeSlot String // Ej: "09:00"
+    timeSlot String 
     state AppointmentState @default(PENDING)
-    
-    // Guardamos el precio histórico para que no cambie si el servicio sube de precio
     priceAtBooking Float 
     
     clientId String
-    client Clients @relation(fields: [clientId], references: [id], onDelete: Restrict) // Restrict evita borrar clientes con citas
+    client Clients @relation(fields: [clientId], references: [id], onDelete: Restrict) 
 
     barberId String
     barber User @relation("AppointmentBarber", fields: [barberId], references: [id], onDelete: Restrict)
@@ -105,12 +101,14 @@ model Appointment {
     updatedAt DateTime @updatedAt
     
     historyAppointment HistoryAppointment[]
+
+    @@unique([barberId, date, timeSlot]) 
 }
 
 model Clients {
     id String @id @default(uuid())
     name String
-    phone String @unique // Un cliente no debería duplicarse por teléfono
+    phone String @unique 
     haveWhatsApp Boolean @default(true)
     appointments Appointment[]
 }
@@ -118,7 +116,7 @@ model Clients {
 model BusinessHour {
     id String @id @default(uuid())
     day DayOfWeek
-    timeSlot String // Ej: "09:00"
+    timeSlot String 
     isActive Boolean @default(true)
 
     barberId String
@@ -130,7 +128,7 @@ model BusinessHour {
 model HistoryAppointment {
     id String @id @default(uuid())
     state AppointmentState 
-    changedAt DateTime @default(now()) // Para saber cuándo cambió de estado
+    changedAt DateTime @default(now()) 
 
     barberId String
     barber User @relation(fields: [barberId], references: [id], onDelete: Cascade)
@@ -140,4 +138,13 @@ model HistoryAppointment {
 
     serviceId String
     service Services @relation(fields: [serviceId], references: [id], onDelete: Cascade)
+}
+
+model PasswordResetToken {
+    id        String   @id @default(uuid())
+    phone     String
+    otpCode   String
+    expiresAt DateTime
+    used      Boolean  @default(false)
+    createdAt DateTime @default(now())
 }
