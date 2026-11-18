@@ -105,12 +105,20 @@ model Appointment {
     @@unique([barberId, date, timeSlot]) 
 }
 
+
+
 model Clients {
     id String @id @default(uuid())
     name String
-    phone String @unique 
+    phone String @unique
     haveWhatsApp Boolean @default(true)
     appointments Appointment[]
+    
+    strikes Int @default(0)           // Cancelaciones tardías actuales
+    blockCount Int @default(0)        // Cuántas veces ha sido bloqueado
+    blockedUntil DateTime?            // Fecha de desbloqueo
+    isBanned Boolean @default(false)  // Baneo permanente
+    lastStrikeAt DateTime?            // Para limpiar strikes viejos
 }
 
 model BusinessHour {

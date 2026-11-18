@@ -56,6 +56,23 @@ export const deleteUserService = async (id) => {
     const user = await prisma.user.findUnique({ where: { id } });
     if (!user) throw { statusCode: 404, message: 'Usuario no encontrado' };
 
+    //  Evitar desactivar si tiene citas futuras
+    const futureAppointments = await prisma.appointment.count({
+        where: {
+            barberId: id,
+            date: { gte: new Date() },
+            state: { in: ['PENDING', 'CONFIRMED'] }
+        }
+    });
+
+    if (futureAppointments > 0) {
+        throw { 
+            statusCode: 400, 
+            message: `No se puede desactivar al barbero porque tiene ${futureAppointments} citas pendientes. Cancele o reasigne primero.` 
+        };
+    }
+
+    // Si pasa, hacemos el Soft Delete
     return await prisma.user.update({
         where: { id },
         data: { state: false }

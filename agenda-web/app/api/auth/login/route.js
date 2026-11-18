@@ -12,7 +12,6 @@ const loginSchema = z.object({
 
 export async function POST(request) {
     try {
-        // 🛡️ D7: RATE LIMITING (Máximo 5 intentos por minuto por IP)
         const ip = request.headers.get('x-forwarded-for') || '127.0.0.1';
         const isAllowed = rateLimit(ip, 5, 60000);
 
@@ -53,7 +52,6 @@ export async function POST(request) {
         return response;
 
     } catch (error) {
-        // 🛡️ B4: MANEJO DE ERRORES CENTRALIZADO
         return handleApiError(error, "Error en Login");
     }
 }
