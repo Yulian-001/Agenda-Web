@@ -2,7 +2,7 @@
 import bcrypt from 'bcryptjs';
 import { prisma } from '../utils/prisma';
 import jwt from 'jsonwebtoken';
-
+import { logger } from '../utils/logger';
 
 
 
@@ -122,11 +122,8 @@ export const generateOTPService = async (phone) => {
     await prisma.passwordResetToken.create({
         data: { phone, otpCode, expiresAt }
     });
-
-    //  SIMULACIÓN DE WHATSAPP/SMS
-    console.log(`\n=========================================`);
-    console.log(`📱 OTP PARA ${phone}: [ ${otpCode} ]`);
-    console.log(`=========================================\n`);
+    
+    logger.dev(`OTP PARA ${phone}: [ ${otpCode} ]`);
 
     return { message: "Código de recuperación enviado" };
 };

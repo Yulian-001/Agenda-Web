@@ -2,6 +2,7 @@
 import { NextResponse } from 'next/server';
 import { verifyAuth } from '../../../utils/auth';
 import { getFinancesService } from '../../../services/finance.service';
+import { handleApiError } from '../../../utils/errorHandler'; // 🛡️ Importación crucial
 
 export async function GET(request) {
     try {
@@ -24,8 +25,6 @@ export async function GET(request) {
         }, { status: 200 });
 
     } catch (error) {
-        console.error("Error en finanzas:", error);
-        if (error.statusCode) return NextResponse.json({ error: error.message }, { status: error.statusCode });
-        return NextResponse.json({ error: "Error interno del servidor" }, { status: 500 });
+        return handleApiError(error, "Error en Finanzas");
     }
 }
