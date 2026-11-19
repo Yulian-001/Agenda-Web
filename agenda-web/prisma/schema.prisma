@@ -176,4 +176,14 @@ model PasswordResetToken {
     used      Boolean  @default(false)
     failedAttempts Int @default(0)
     createdAt DateTime @default(now())
+
+    @@index([phone, createdAt])
+}
+
+model RecoveryRateLimit {
+    key       String     @id
+    attempts  DateTime[] @default([])
+    expiresAt DateTime
+
+    @@index([expiresAt])
 }

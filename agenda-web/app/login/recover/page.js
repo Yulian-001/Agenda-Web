@@ -6,8 +6,6 @@ import { useRouter } from 'next/navigation';
 import { securePasswordMessage, securePasswordPattern } from '../../../config/auth';
 import { AuthPanel, clientDeadline, inputStyle, PasswordField, postAuth, primary, timeLabel, useRemaining } from '../auth-ui';
 
-const invalidDeadline = { at: 0, receivedAt: 0 };
-
 export default function RecoverPage() {
     const router = useRouter();
     const [step, setStep] = useState('phone');
@@ -52,7 +50,6 @@ export default function RecoverPage() {
             setExpiresAt(clientDeadline(data.expiresAt, data.serverTime));
             setStep('password');
         } catch (failure) {
-            if (failure.code === 'CODE_UNAVAILABLE') setExpiresAt(invalidDeadline);
             setError(failure.message);
         } finally {
             setBusy(false);
@@ -72,10 +69,7 @@ export default function RecoverPage() {
             await postAuth('reset-password', { phone, otpCode, newPassword });
             router.replace('/login?recovered=1');
         } catch (failure) {
-            if (failure.code === 'CODE_UNAVAILABLE') {
-                setExpiresAt(invalidDeadline);
-                setStep('code');
-            }
+            if (failure.code === 'INVALID_CODE') setStep('code');
             setError(failure.message);
             setBusy(false);
         }

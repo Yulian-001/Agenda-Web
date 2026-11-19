@@ -30,6 +30,10 @@ Edita [`config/business.json`](config/business.json) en el repositorio privado d
 
 Recompila al publicar cambios de identidad. Servicios, perfiles, fotos del equipo, horarios y reservas se gestionan con los módulos de la aplicación.
 
+## Límite de recuperación por IP
+
+Configura `RECOVERY_CLIENT_IP_HEADER` con el nombre de una cabecera que tu proxy sobrescriba con una sola IP verificada por petición, como `x-client-ip`. Bloquea el acceso directo al servidor de la aplicación si configuras esta opción. Cuando no hay una cabecera de confianza configurada o su valor es inválido, las solicitudes comparten un límite por IP. El límite por número se aplica en ambos casos.
+
 ## Learn More
 
 To learn more about Next.js, take a look at the following resources:

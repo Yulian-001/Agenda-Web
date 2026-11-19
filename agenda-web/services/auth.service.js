@@ -1,7 +1,8 @@
 // services/auth.service.js
 import bcrypt from 'bcryptjs';
 import { createHmac, randomInt, timingSafeEqual } from 'node:crypto';
-import { accountLockMs, maxCodeFailures, maxLoginFailures, recoveryDurationMs, recoveryResendMs } from '../config/auth';
+import { setTimeout as delay } from 'node:timers/promises';
+import { accountLockMs, maxCodeFailures, maxLoginFailures, recoveryDurationMs } from '../config/auth';
 import { prisma } from '../utils/prisma';
 import jwt from 'jsonwebtoken';
 import { logger } from '../utils/logger';
@@ -73,76 +74,75 @@ function codeDigest(phone, code) {
     return createHmac('sha256', process.env.JWT_SECRET).update('password-recovery:' + phone + ':' + code).digest();
 }
 
-function ensureRecoveryAvailable() {
+export function ensureRecoveryAvailable() {
     if (process.env.NODE_ENV === 'production') {
         throw { statusCode: 503, message: 'La recuperación por código todavía no está disponible. Contacta al administrador.' };
     }
 }
 
-export const generateOTPService = async phone => {
+export const generateOTPService = async (phone, requestedAt, expiresAt) => {
     ensureRecoveryAvailable();
-    const result = await prisma.$transaction(async tx => {
+    const code = await prisma.$transaction(async tx => {
         const account = await lockAccount(tx, phone);
-        const now = Date.now();
-        if (!account) return { expiresAt: new Date(now + recoveryDurationMs), resendAt: new Date(now + recoveryResendMs) };
+        if (!account || expiresAt <= new Date()) return;
 
-        const previous = await tx.passwordResetToken.findFirst({
-            where: { phone }, orderBy: { createdAt: 'desc' }, select: { createdAt: true, expiresAt: true }
+        const newer = await tx.passwordResetToken.findFirst({
+            where: { phone, createdAt: { gte: requestedAt } }, select: { id: true }
         });
-        if (previous && previous.createdAt.getTime() + recoveryResendMs > now) {
-            return { expiresAt: previous.expiresAt, resendAt: new Date(previous.createdAt.getTime() + recoveryResendMs) };
-        }
+        if (newer) return;
 
-        const code = String(randomInt(1000000)).padStart(6, '0');
-        const expiresAt = new Date(now + recoveryDurationMs);
+        const otp = String(randomInt(1000000)).padStart(6, '0');
         await tx.passwordResetToken.updateMany({ where: { phone, used: false }, data: { used: true } });
         await tx.passwordResetToken.create({
-            data: { phone, otpCode: codeDigest(phone, code).toString('hex'), expiresAt }
+            data: { phone, otpCode: codeDigest(phone, otp).toString('hex'), expiresAt, createdAt: requestedAt }
         });
-        return { code, expiresAt, resendAt: new Date(now + recoveryResendMs) };
+        return otp;
     });
 
-    if (result.code) logger.dev(`OTP PARA ${phone}: [ ${result.code} ]`);
-    return {
-        message: 'Si el teléfono está registrado, el código de prueba aparece en la terminal de desarrollo.',
-        expiresAt: result.expiresAt, resendAt: result.resendAt
-    };
+    if (code) logger.dev(`OTP PARA ${phone}: [ ${code} ]`);
 };
+
+const invalidRecoveryCode = {
+    statusCode: 400, code: 'INVALID_CODE',
+    message: 'El código no es válido. Revisa los dígitos o solicita uno nuevo.'
+};
+const emptyDigest = Buffer.alloc(32);
 
 async function processRecoveryCode(phone, otpCode, newPassword) {
     ensureRecoveryAvailable();
+    const startedAt = performance.now();
     const result = await prisma.$transaction(async tx => {
         const account = await lockAccount(tx, phone);
         const now = new Date();
-        const token = account && await tx.passwordResetToken.findFirst({
+        const token = await tx.passwordResetToken.findFirst({
             where: { phone, used: false, expiresAt: { gt: now }, createdAt: { gt: new Date(now.getTime() - recoveryDurationMs) } },
             orderBy: { createdAt: 'desc' }
         });
-        if (!token) return { error: { statusCode: 400, code: 'CODE_UNAVAILABLE', message: 'El código venció o ya fue utilizado. Solicita uno nuevo.' } };
-
-        const stored = Buffer.from(token.otpCode, 'hex');
+        const stored = token ? Buffer.from(token.otpCode, 'hex') : emptyDigest;
         const expected = codeDigest(phone, otpCode);
-        if (stored.length !== expected.length || !timingSafeEqual(stored, expected)) {
+        const matches = timingSafeEqual(stored.length === expected.length ? stored : emptyDigest, expected);
+        if (!account || !token) return null;
+        if (!matches) {
             const failedAttempts = token.failedAttempts + 1;
-            const used = failedAttempts >= maxCodeFailures;
-            await tx.passwordResetToken.update({ where: { id: token.id }, data: { failedAttempts, used } });
-            return { error: {
-                statusCode: 400, code: used ? 'CODE_UNAVAILABLE' : 'INVALID_CODE',
-                message: used ? 'Agotaste los intentos. Solicita un código nuevo.' : 'El código ingresado es incorrecto.'
-            } };
+            await tx.passwordResetToken.update({
+                where: { id: token.id }, data: { failedAttempts, used: failedAttempts >= maxCodeFailures }
+            });
+            return null;
         }
 
         if (newPassword === undefined) return { message: 'Código verificado', expiresAt: token.expiresAt };
         const password = await bcrypt.hash(newPassword, 10);
-        if (token.expiresAt <= new Date() || token.createdAt.getTime() + recoveryDurationMs <= Date.now()) {
-            return { error: { statusCode: 400, code: 'CODE_UNAVAILABLE', message: 'El código venció. Solicita uno nuevo.' } };
-        }
+        if (token.expiresAt <= new Date() || token.createdAt.getTime() + recoveryDurationMs <= Date.now()) return null;
+
         await tx.user.update({ where: { id: account.id }, data: { password, failedAttempts: 0, lockUntil: null } });
         await tx.passwordResetToken.update({ where: { id: token.id }, data: { used: true } });
         return { message: 'Contraseña actualizada' };
     });
-    if (result.error) throw result.error;
-    return result;
+
+    if (result) return result;
+    // Pad rejected attempts outside the transaction so response time exposes less account state.
+    await delay(Math.max(0, 100 - (performance.now() - startedAt)));
+    throw invalidRecoveryCode;
 }
 
 export const verifyRecoveryCodeService = (phone, otpCode) => processRecoveryCode(phone, otpCode);
