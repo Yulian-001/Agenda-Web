@@ -1,12 +1,12 @@
 'use client';
 
 import { useEffect, useRef, useState } from 'react';
-import Image from 'next/image';
+import BrandLogo from '../../components/BrandLogo';
 import Link from 'next/link';
 import { CalendarDays, Eye, EyeOff, Home, Lock, Menu, X } from 'lucide-react';
 
-export const inputStyle = 'min-h-14 w-full rounded-xl border border-gray-200 bg-gray-50 px-4 text-stone-950 outline-none focus:border-stone-900 focus:bg-white';
-export const primary = 'min-h-12 w-full rounded-xl bg-black px-4 py-3 font-bold text-white hover:bg-stone-800 disabled:opacity-50';
+export const inputStyle = 'min-h-14 w-full rounded-xl border border-brand-border bg-brand-background px-4 text-brand-text outline-none focus:border-brand-accent focus:bg-brand-surface';
+export const primary = 'min-h-12 w-full rounded-xl bg-brand-primary px-4 py-3 font-bold text-brand-on-primary hover:bg-brand-primary-hover disabled:opacity-50';
 
 export function clientDeadline(value, serverTime) {
     if (!value) return null;
@@ -33,22 +33,22 @@ export const timeLabel = seconds => Math.floor(seconds / 60) + ':' + String(seco
 
 export function AuthPanel({ title, description, children }) {
     const menu = useRef(null);
-    return <main className="flex min-h-dvh items-center justify-center bg-gray-100 sm:p-6">
-        <section className="relative min-h-dvh w-full max-w-xl bg-white px-6 pb-12 pt-20 sm:min-h-0 sm:rounded-3xl sm:px-12 sm:shadow-xl">
+    return <main className="flex min-h-dvh items-center justify-center bg-brand-background sm:p-6">
+        <section className="relative min-h-dvh w-full max-w-xl bg-brand-surface px-6 pb-12 pt-20 sm:min-h-0 sm:rounded-3xl sm:px-12 sm:shadow-xl">
             <button type="button" aria-label="Abrir menú" aria-haspopup="dialog" onClick={() => menu.current.showModal()}
-                className="absolute left-5 top-5 rounded-lg p-2 text-stone-950 hover:bg-gray-100"><Menu size={28} /></button>
-            <dialog ref={menu} aria-labelledby="auth-menu-title" className="fixed inset-0 m-auto w-[min(90vw,22rem)] rounded-2xl bg-white p-5 shadow-2xl backdrop:bg-black/40">
+                className="absolute left-5 top-5 rounded-lg p-2 text-brand-text hover:bg-brand-background"><Menu size={28} /></button>
+            <dialog ref={menu} aria-labelledby="auth-menu-title" className="fixed inset-0 m-auto w-[min(90vw,22rem)] rounded-2xl bg-brand-surface p-5 text-brand-text shadow-2xl backdrop:bg-black/40">
                 <div className="mb-3 flex items-center justify-between">
                     <h2 id="auth-menu-title" className="font-bold">Navegación</h2>
-                    <button type="button" aria-label="Cerrar menú" onClick={() => menu.current.close()} className="rounded-lg p-2 hover:bg-gray-100"><X size={20} /></button>
+                    <button type="button" aria-label="Cerrar menú" onClick={() => menu.current.close()} className="rounded-lg p-2 hover:bg-brand-background"><X size={20} /></button>
                 </div>
-                <Link href="/" className="flex items-center gap-3 rounded-lg p-3 hover:bg-gray-100"><Home size={19} /> Ir al inicio</Link>
-                <Link href="/reserva" className="flex items-center gap-3 rounded-lg p-3 hover:bg-gray-100"><CalendarDays size={19} /> Hacer una reserva</Link>
+                <Link href="/" className="flex items-center gap-3 rounded-lg p-3 hover:bg-brand-background"><Home size={19} /> Ir al inicio</Link>
+                <Link href="/reserva" className="flex items-center gap-3 rounded-lg p-3 hover:bg-brand-background"><CalendarDays size={19} /> Hacer una reserva</Link>
             </dialog>
             <div className="mb-8 text-center">
-                <Image src="/logos/LogoSama.png" alt="SAMA" width={112} height={112} className="mx-auto mb-6 aspect-square rounded-full bg-black object-contain shadow-md" />
-                <h1 className="text-2xl font-bold text-stone-950">{title}</h1>
-                {description && <p className="mt-2 text-sm text-stone-600">{description}</p>}
+                <BrandLogo size={112} eager className="mx-auto mb-6 shadow-md" />
+                <h1 className="text-2xl font-bold text-brand-text">{title}</h1>
+                {description && <p className="mt-2 text-sm text-brand-muted">{description}</p>}
             </div>
             {children}
         </section>
@@ -58,13 +58,13 @@ export function AuthPanel({ title, description, children }) {
 export function PasswordField({ id, label, autoComplete, ...props }) {
     const [visible, setVisible] = useState(false);
     return <div>
-        <label htmlFor={id} className="mb-1 block text-sm font-semibold text-stone-800">{label}</label>
+        <label htmlFor={id} className="mb-1 block text-sm font-semibold text-brand-text">{label}</label>
         <div className="relative">
             <Lock size={18} aria-hidden className="pointer-events-none absolute left-4 top-1/2 -translate-y-1/2 text-stone-500" />
             <input {...props} id={id} type={visible ? 'text' : 'password'} autoComplete={autoComplete} required
                 className={inputStyle + ' pl-11 pr-12'} />
             <button type="button" aria-label={(visible ? 'Ocultar ' : 'Mostrar ') + label.toLowerCase()}
-                onClick={() => setVisible(!visible)} className="absolute right-1 top-1/2 -translate-y-1/2 rounded-lg p-3 text-stone-700 hover:bg-gray-200">
+                onClick={() => setVisible(!visible)} className="absolute right-1 top-1/2 -translate-y-1/2 rounded-lg p-3 text-brand-muted hover:bg-brand-tint">
                 {visible ? <EyeOff size={18} /> : <Eye size={18} />}
             </button>
         </div>

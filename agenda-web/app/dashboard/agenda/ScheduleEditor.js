@@ -182,7 +182,7 @@ export default function ScheduleEditor({ initialSchedule, today, initialDay }) {
         <div className="mx-auto max-w-5xl space-y-5 pb-12">
             <header className="flex flex-wrap items-center justify-between gap-4 rounded-3xl border border-slate-200 bg-white p-5 shadow-sm sm:p-7">
                 <div className="flex items-center gap-3 sm:gap-4">
-                    <span className="rounded-xl bg-slate-950 p-3 text-white"><CalendarDays size={22} /></span>
+                    <span className="rounded-xl bg-brand-primary p-3 text-brand-on-primary"><CalendarDays size={22} /></span>
                     <div>
                         <h1 className="text-2xl font-bold tracking-tight text-slate-950">Agenda</h1>
                         <p className="mt-1 text-sm text-slate-600">Configura los días y las horas de atención.</p>
@@ -323,7 +323,7 @@ export default function ScheduleEditor({ initialSchedule, today, initialDay }) {
                             setResult(null);
                         }}><RotateCcw size={15} className="mr-1 inline" /> Descartar</button>}
                         <button type="button" onClick={save} disabled={!dirty || !canEdit || saving}
-                            className="rounded-xl bg-slate-950 px-4 py-2.5 text-sm font-semibold text-white hover:bg-slate-800 disabled:opacity-50">
+                            className="rounded-xl bg-brand-primary px-4 py-2.5 text-sm font-semibold text-brand-on-primary hover:bg-brand-primary-hover disabled:opacity-50">
                             {saving ? 'Guardando…' : general ? 'Guardar horario semanal' : 'Guardar excepción'}
                         </button>
                     </div>

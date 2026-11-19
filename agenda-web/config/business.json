@@ -1,0 +1,24 @@
+{
+  "brand": {
+    "name": "SAMA",
+    "logo": "/logos/LogoSama.png",
+    "heroTitle": "Experiencia premium profesional y cerificada.",
+    "heroSubtitle": "Agenda tu cita en línea y disfruta de nuestros servicios.",
+    "loginTitle": "Bienvenido a SAMA",
+    "address": "Av. Principal 123, Villavicencio"
+  },
+  "socials": {
+    "facebook": "https://facebook.com/tu-barberia",
+    "instagram": "https://instagram.com/tu-barberia",
+    "tiktok": "https://tiktok.com/@tu-barberia"
+  },
+  "colors": {
+    "primary": "#000000",
+    "onPrimary": "#ffffff",
+    "accent": "#1d4ed8",
+    "background": "#f3f4f6",
+    "surface": "#ffffff",
+    "text": "#171717",
+    "mutedText": "#52525b"
+  }
+}

@@ -122,7 +122,7 @@ function BarberForm({ barber, catalog, viewerId, pending, error, onCancel, onSav
                         {error && <p role="alert" className="rounded-xl bg-red-50 p-3 text-sm text-red-700">{error}</p>}
                         <div className="flex flex-col-reverse gap-3 sm:flex-row">
                             <button type="button" onClick={onCancel} className="w-full rounded-xl bg-gray-200 py-3 font-bold text-gray-700">Cancelar</button>
-                            <button type="submit" disabled={processingPhoto} className="w-full rounded-xl bg-black py-3 font-bold text-white disabled:opacity-60">
+                            <button type="submit" disabled={processingPhoto} className="w-full rounded-xl bg-brand-primary py-3 font-bold text-brand-on-primary hover:bg-brand-primary-hover disabled:opacity-60">
                                 {pending ? 'Guardando…' : editing ? 'Guardar' : 'Crear barbero'}
                             </button>
                         </div>
@@ -209,7 +209,7 @@ export default function BarberosPage() {
                     <h1 className="flex items-center gap-2 text-2xl font-bold text-gray-800"><User size={24} /> Gestión de Barberos</h1>
                     <p className="mt-1 text-sm text-gray-500">Administra el equipo, sus roles y servicios.</p>
                 </div>
-                <button disabled={pending || !team || Boolean(loadError)} onClick={() => edit(null)} className="flex items-center gap-2 rounded-xl bg-[var(--primary)] px-6 py-3 font-bold text-white disabled:opacity-50">
+                <button disabled={pending || !team || Boolean(loadError)} onClick={() => edit(null)} className="flex items-center gap-2 rounded-xl bg-brand-primary px-6 py-3 font-bold text-brand-on-primary hover:bg-brand-primary-hover disabled:opacity-50">
                     <Plus size={20} /> Agregar barbero
                 </button>
             </div>

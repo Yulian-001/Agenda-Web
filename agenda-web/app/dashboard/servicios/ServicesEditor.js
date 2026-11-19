@@ -122,7 +122,7 @@ export default function ServicesEditor({ initialServices, canManageState, canEdi
                 {canManageState && <div className="flex flex-wrap gap-2" aria-label="Filtrar por estado">
                     {filters.map(([value, label]) => <button key={value} type="button" aria-pressed={filter === value} onClick={() => setFilter(value)}
                         className={'rounded-lg border px-3 py-1.5 text-sm font-semibold ' + (filter === value
-                            ? 'border-gray-900 bg-gray-900 text-white' : 'border-gray-200 bg-white text-gray-700 hover:bg-gray-50')}>
+                            ? 'border-brand-primary bg-brand-primary text-brand-on-primary' : 'border-gray-200 bg-white text-gray-700 hover:bg-gray-50')}>
                         {label} <span className="ml-0.5 tabular-nums opacity-80">{counts[value]}</span>
                     </button>)}
                 </div>}
@@ -193,7 +193,7 @@ export default function ServicesEditor({ initialServices, canManageState, canEdi
                                     </label>
                                 </div>
                                 {result?.error && <p role="alert" className="rounded-xl bg-rose-50 p-3 text-sm text-rose-900">{result.error}</p>}
-                                <button type="submit" className="w-full rounded-xl bg-black py-3 font-bold text-white hover:bg-gray-800 disabled:opacity-50">
+                                <button type="submit" className="w-full rounded-xl bg-brand-primary py-3 font-bold text-brand-on-primary hover:bg-brand-primary-hover disabled:opacity-50">
                                     {busy ? 'Guardando…' : 'Guardar servicio'}
                                 </button>
                             </fieldset>

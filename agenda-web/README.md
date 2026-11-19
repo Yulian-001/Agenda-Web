@@ -20,6 +20,16 @@ You can start editing the page by modifying `app/page.tsx`. The page auto-update
 
 This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
 
+## Personalizar una copia para un negocio
+
+Edita [`config/business.json`](config/business.json) en el repositorio privado del cliente:
+
+- `brand` define el nombre, el título y la descripción de la portada, el saludo del login, la dirección y la ruta del logo. Guarda el archivo en `public/logos/` y referencia, por ejemplo, `"/logos/mi-negocio.webp"`. Puedes usar PNG, JPEG, WebP o SVG. Si dejas `logo` vacío, se muestra la inicial.
+- `socials` contiene los enlaces públicos. Usa una cadena vacía o elimina la entrada para ocultar una red. Deja vacía la dirección si no quieres mostrarla.
+- `colors` aplica la paleta. `primary` y `onPrimary` controlan los botones y la navegación. `accent` se usa para enlaces y focos. `background` y `surface` controlan el fondo y las tarjetas. `text` y `mutedText` definen el texto principal y secundario. Por ejemplo, usa `"#1e3a8a"` en `primary`, `"#ffffff"` en `onPrimary` y `"#fdf2f8"` en `background` para una paleta azul y rosada.
+
+Recompila al publicar cambios de identidad. Servicios, perfiles, fotos del equipo, horarios y reservas se gestionan con los módulos de la aplicación.
+
 ## Learn More
 
 To learn more about Next.js, take a look at the following resources:

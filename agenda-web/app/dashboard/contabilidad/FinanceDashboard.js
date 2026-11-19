@@ -10,7 +10,7 @@ const money = value => currency.format(value);
 const percentage = value => value.toLocaleString('es-CO', { maximumFractionDigits: 2 }) + ' %';
 const panel = 'rounded-2xl border border-stone-200 bg-white p-4 shadow-sm sm:p-5';
 const control = 'min-h-10 w-full rounded-lg border border-stone-200 bg-stone-50 px-2.5 text-sm text-stone-950 focus-visible:outline-2 focus-visible:outline-offset-1';
-const primary = 'min-h-10 rounded-lg bg-black px-3 py-2 text-sm font-semibold text-white hover:bg-stone-800 disabled:opacity-50';
+const primary = 'min-h-10 rounded-lg bg-brand-primary px-3 py-2 text-sm font-semibold text-brand-on-primary hover:bg-brand-primary-hover disabled:opacity-50';
 const neutral = 'min-h-10 rounded-lg border border-stone-200 bg-white px-3 py-2 text-sm font-semibold text-stone-800 hover:bg-stone-100';
 
 function periodLabel(point) {
@@ -20,10 +20,10 @@ function periodLabel(point) {
 
 function Metric({ label, value, detail, dark }) {
     return (
-        <div className={'min-w-0 rounded-xl p-3 sm:p-4 ' + (dark ? 'bg-stone-950 text-white' : 'border border-stone-200 bg-white')}>
-            <dt className={'text-xs font-semibold ' + (dark ? 'text-stone-200' : 'text-stone-600')}>{label}</dt>
+        <div className={'min-w-0 rounded-xl p-3 sm:p-4 ' + (dark ? 'bg-brand-primary text-brand-on-primary' : 'border border-stone-200 bg-white')}>
+            <dt className={'text-xs font-semibold ' + (dark ? 'text-brand-on-primary/90' : 'text-stone-600')}>{label}</dt>
             <dd className="mt-1 break-words text-lg font-bold leading-tight tracking-tight sm:text-xl">{value}</dd>
-            {detail && <dd className={'mt-1 text-xs ' + (dark ? 'text-stone-300' : 'text-stone-600')}>{detail}</dd>}
+            {detail && <dd className={'mt-1 text-xs ' + (dark ? 'text-brand-on-primary/80' : 'text-stone-600')}>{detail}</dd>}
         </div>
     );
 }

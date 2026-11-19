@@ -2,6 +2,7 @@
 
 import { useState } from 'react';
 import Link from 'next/link';
+import business from '../../config/business.json';
 import { useRouter } from 'next/navigation';
 import { AuthPanel, clientDeadline, inputStyle, PasswordField, postAuth, primary, timeLabel, useRemaining } from './auth-ui';
 
@@ -28,20 +29,20 @@ export default function LoginForm({ recovered }) {
         }
     }
 
-    return <AuthPanel title="Bienvenido a SAMA">
+    return <AuthPanel title={business.brand.loginTitle || 'Bienvenido a ' + business.brand.name}>
         {recovered && <p role="status" className="mb-4 rounded-xl bg-emerald-50 p-3 text-sm text-emerald-900">Contraseña actualizada. Ya puedes iniciar sesión.</p>}
         <form onSubmit={login} className="space-y-4">
-            <label className="block text-sm font-semibold text-stone-800">
+            <label className="block text-sm font-semibold text-brand-text">
                 Usuario (teléfono)
                 <input name="phone" type="tel" autoComplete="username" required className={inputStyle + ' mt-1'} />
             </label>
             <PasswordField id="password" name="password" label="Contraseña" autoComplete="current-password" />
             <div className="text-right">
-                <Link href="/login/recover" className="text-sm font-semibold text-blue-700 hover:underline">Recuperar contraseña</Link>
+                <Link href="/login/recover" className="text-sm font-semibold text-brand-accent hover:underline">Recuperar contraseña</Link>
             </div>
             {error && (!retryAt || remaining > 0) && <p role="alert" className="rounded-xl bg-red-50 p-3 text-sm text-red-900">{error}</p>}
-            {retryAt && (remaining ? <p className="text-sm text-stone-700">Puedes volver a intentarlo en <strong className="tabular-nums">{timeLabel(remaining)}</strong>.</p> :
-                <p role="status" className="text-sm text-stone-700">Ya puedes volver a intentarlo.</p>)}
+            {retryAt && (remaining ? <p className="text-sm text-brand-muted">Puedes volver a intentarlo en <strong className="tabular-nums">{timeLabel(remaining)}</strong>.</p> :
+                <p role="status" className="text-sm text-brand-muted">Ya puedes volver a intentarlo.</p>)}
             <button type="submit" className={primary} disabled={busy || remaining > 0}>{busy ? 'Entrando…' : 'Entrar'}</button>
         </form>
     </AuthPanel>;
