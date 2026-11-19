@@ -1,96 +1,76 @@
-// app/page.js
 'use client';
 
 import { useState } from 'react';
 import Link from 'next/link';
 import { Scissors, MapPin, Menu, X, LogIn, Home } from 'lucide-react';
 import { FaFacebook, FaInstagram, FaTiktok } from 'react-icons/fa6';
-import businessData from '../config/business';
+import BrandLogo from '../components/BrandLogo';
+import business from '../config/business.json';
+
+const socialNetworks = [
+  { key: 'facebook', label: 'Facebook', Icon: FaFacebook },
+  { key: 'instagram', label: 'Instagram', Icon: FaInstagram },
+  { key: 'tiktok', label: 'TikTok', Icon: FaTiktok },
+];
 
 export default function HomePage() {
-  const { brand, socials } = businessData;
+  const { brand, socials } = business;
   const [isMenuOpen, setIsMenuOpen] = useState(false);
+  const links = socialNetworks.filter(({ key }) => socials?.[key]);
 
   return (
-    <main className=" min-h-screen w-full bg-gray-100 flex justify-center items-center font-sans md:p-6 overflow-hidden">
-      <div className="w-full max-w-4xl bg-white min-h-screen md:min-h-[860px] md:rounded-3xl md:shadow-2xl flex flex-col relative overflow-hidden">
-
-        {/* BACKDROP */}
-        <div
-          className={`absolute inset-0 bg-slate-900/40 z-40 transition-opacity duration-300 ${isMenuOpen ? 'opacity-100' : 'opacity-0 pointer-events-none'
-            }`}
-          onClick={() => setIsMenuOpen(false)}
-        />
-
-        {/* SIDEBAR PÚBLICO */}
-        <div
-          className={`absolute top-0 left-0 h-full  w-[260px] bg-white z-50 shadow-2xl flex flex-col transition-transform duration-300 ease-out ${isMenuOpen ? 'translate-x-0' : '-translate-x-full'
-            }`}
-        >
-          <div className="p-5 flex justify-between items-center border-b border-gray-100">
-            <div className="flex items-center gap-2">
-              <div className="w-8 h-8 bg-[var(--primary)] text-white rounded-lg flex items-center justify-center font-bold text-sm">
-                {brand.logo.charAt(0)}
-              </div>
-              <span className="font-bold text-gray-800 tracking-wide">{brand.logo}</span>
+    <main className="flex min-h-dvh w-full items-center justify-center bg-brand-background font-sans md:p-6">
+      <div className="relative flex min-h-dvh w-full max-w-4xl flex-col overflow-hidden bg-brand-surface md:min-h-[min(860px,calc(100dvh-3rem))] md:rounded-3xl md:shadow-xl">
+        {isMenuOpen && <>
+          <div className="absolute inset-0 z-40 bg-black/40" onClick={() => setIsMenuOpen(false)} />
+          <nav id="public-navigation" aria-label="Menú principal" className="absolute inset-y-0 left-0 z-50 flex w-65 max-w-full flex-col bg-brand-surface shadow-2xl">
+            <div className="flex items-center justify-between gap-2 border-b border-brand-border p-5">
+              <BrandLogo size={36} decorative />
+              <span className="flex-1 break-words font-bold">{brand.name}</span>
+              <button type="button" aria-label="Cerrar menú" onClick={() => setIsMenuOpen(false)} className="rounded-lg p-1 hover:bg-brand-background"><X size={20} /></button>
             </div>
-            <button onClick={() => setIsMenuOpen(false)} className="p-1 text-gray-400 hover:text-gray-800">
-              <X size={20} />
-            </button>
-          </div>
+            <div className="flex flex-1 flex-col gap-1 px-3 py-4">
+              <Link href="/" onClick={() => setIsMenuOpen(false)} className="flex items-center gap-3 rounded-xl p-3 hover:bg-brand-background">
+                <Home size={18} /> Inicio
+              </Link>
+              <Link href="/reserva" className="flex items-center gap-3 rounded-xl p-3 hover:bg-brand-background">
+                <Scissors size={18} /> Agendar cita
+              </Link>
+            </div>
+            <div className="border-t border-brand-border p-4">
+              <Link href="/login" className="flex w-full items-center justify-center gap-2 rounded-xl bg-brand-primary py-3 text-sm font-semibold text-brand-on-primary hover:bg-brand-primary-hover">
+                <LogIn size={18} /> Ingresar al sistema
+              </Link>
+            </div>
+          </nav>
+        </>}
 
-          <div className="flex-1 py-4 px-3 flex flex-col gap-1">
-            <Link href="/" className="flex items-center gap-3 text-gray-700 p-3 rounded-xl hover:bg-gray-50">
-              <Home size={18} className="text-gray-500" />
-              <span className="font-medium text-sm">Inicio</span>
-            </Link>
-            <Link href="/reserva" className="flex items-center gap-3 text-gray-700 p-3 rounded-xl hover:bg-gray-50">
-              <Scissors size={18} className="text-gray-500" />
-              <span className="font-medium text-sm">Agendar Cita</span>
-            </Link>
-          </div>
-
-          <div className="p-4 border-t border-gray-100">
-            <Link href="/login" className="flex items-center justify-center gap-2 w-full bg-[var(--primary)] text-white py-3 rounded-xl font-semibold text-sm hover:opacity-90">
-              <LogIn size={18} />
-              Ingresar al Sistema
-            </Link>
-          </div>
+        <div className="p-6 pb-0">
+          <button type="button" aria-label="Abrir menú" aria-expanded={isMenuOpen} aria-controls={isMenuOpen ? 'public-navigation' : undefined}
+            onClick={() => setIsMenuOpen(true)} className="rounded-lg p-2 hover:bg-brand-background">
+            <Menu size={28} />
+          </button>
         </div>
 
-        
+        <section className="flex flex-1 flex-col items-center justify-center px-6 py-12 text-center">
+          <BrandLogo size={160} eager className="mb-8 shadow-xl" />
+          <h1 className="mb-2 text-2xl font-semibold">{brand.heroTitle || brand.name}</h1>
+          {brand.heroSubtitle && <p className="max-w-sm text-brand-muted">{brand.heroSubtitle}</p>}
+          <Link href="/reserva" className="mt-8 flex items-center gap-3 rounded-full bg-brand-primary px-8 py-4 text-lg font-semibold text-brand-on-primary shadow-lg hover:bg-brand-primary-hover">
+            <Scissors size={20} /> Ver servicios
+          </Link>
+        </section>
 
-        <div className='flex flex-col gap-8'>
-          {/* CONTENIDO PRINCIPAL */}
-          <div className="w-full flex justify-start p-6 pb-0">
-            <button onClick={() => setIsMenuOpen(true)} className="text-gray-800 p-2 hover:bg-gray-100 rounded-lg">
-              <Menu size={28} />
-            </button>
-          </div>
-
-          <div className="flex-1 flex flex-col items-center justify-center text-center px-6">
-            <div className="w-40 h-40 bg-[var(--primary)] rounded-full flex items-center justify-center mb-8 shadow-xl">
-              <span className="text-white font-black text-3xl tracking-widest">{brand.logo}</span>
-            </div>
-            <h2 className="text-2xl font-light text-gray-500 mb-2">{brand.heroTitle}</h2>
-            <p className="text-base text-gray-600 mb-10 max-w-xs">{brand.heroSubtitle}</p>
-            <Link href="/reserva" className="flex items-center gap-3 bg-[var(--primary)] text-white px-8 py-4  mt-8 rounded-full font-semibold text-lg hover:opacity-90 shadow-lg">
-              <Scissors size={20} />
-              Ver servicios
-            </Link>
-          </div>
-
-          <div className="flex flex-col items-center mt-12 gap-4 p-6">
-            <div className="flex gap-3">
-              <a href={socials.facebook} className="p-2.5 border border-gray-200 rounded-full hover:bg-gray-50"><FaFacebook size={18} className="text-gray-800" /></a>
-              <a href={socials.instagram} className="p-2.5 border border-gray-200 rounded-full hover:bg-gray-50"><FaInstagram size={18} className="text-gray-800" /></a>
-              <a href={socials.tiktok} className="p-2.5 border border-gray-200 rounded-full hover:bg-gray-50"><FaTiktok size={18} className="text-gray-800" /></a>
-            </div>
-            <div className="flex items-center gap-1.5 text-gray-400 text-xs">
-              <MapPin size={14} /><span>{brand.address}</span>
-            </div>
-          </div>
-        </div>
+        {(links.length > 0 || brand.address) && <footer className="flex flex-col items-center gap-4 p-6 pb-10">
+          {links.length > 0 && <div className="flex flex-wrap justify-center gap-3">
+            {links.map(({ key, label, Icon }) => <a key={key} href={socials[key]} aria-label={label} className="rounded-full border border-brand-border p-2.5 hover:bg-brand-background">
+              <Icon size={18} aria-hidden="true" />
+            </a>)}
+          </div>}
+          {brand.address && <div className="flex items-center gap-1.5 text-xs text-brand-muted">
+            <MapPin size={14} aria-hidden="true" /> <span>{brand.address}</span>
+          </div>}
+        </footer>}
       </div>
     </main>
   );

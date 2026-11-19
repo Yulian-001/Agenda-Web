@@ -94,8 +94,8 @@ export default function RecoverPage() {
                     {busy ? 'Enviando…' : resendIn ? 'Intenta en ' + timeLabel(resendIn) : 'Enviar código'}
                 </button>
             </form> : <>
-                {step === 'code' && notice && <p role="status" className="text-sm text-stone-700">{notice}</p>}
-                <div className="rounded-xl bg-stone-100 p-3 text-sm font-semibold text-stone-800">
+                {step === 'code' && notice && <p role="status" className="text-sm text-brand-muted">{notice}</p>}
+                <div className="rounded-xl bg-brand-background p-3 text-sm font-semibold text-brand-text">
                     {expired ? 'El código ya no es válido. Solicita uno nuevo.' : <>El código vence en <span role="timer" className="tabular-nums">{timeLabel(remaining)}</span>.</>}
                 </div>
                 {step === 'code' && <form onSubmit={verify} className="space-y-4">
@@ -110,13 +110,13 @@ export default function RecoverPage() {
                     </button>
                 </form>}
                 {step === 'password' && !expired && <form onSubmit={reset} className="space-y-4">
-                    <p className="text-sm text-stone-700">{securePasswordMessage}</p>
+                    <p className="text-sm text-brand-muted">{securePasswordMessage}</p>
                     <PasswordField name="newPassword" id="newPassword" label="Nueva contraseña" autoComplete="new-password" minLength={8} />
                     <PasswordField name="confirmPassword" id="confirmPassword" label="Confirma la contraseña" autoComplete="new-password" minLength={8} />
                     <button type="submit" className={primary} disabled={busy}>{busy ? 'Guardando…' : 'Cambiar contraseña'}</button>
                 </form>}
                 {(step === 'code' || expired) && <div className="flex flex-wrap justify-between gap-3 text-sm font-semibold">
-                    <button type="button" disabled={busy || resendIn > 0} onClick={sendCode} className="text-blue-700 disabled:text-stone-500">
+                    <button type="button" disabled={busy || resendIn > 0} onClick={sendCode} className="text-brand-accent disabled:text-stone-500">
                         {resendIn ? 'Reenviar en ' + timeLabel(resendIn) : 'Reenviar código'}
                     </button>
                     <button type="button" disabled={busy} onClick={() => {
@@ -124,11 +124,11 @@ export default function RecoverPage() {
                         setExpiresAt(null);
                         setResendAt(null);
                         setError('');
-                    }} className="text-stone-700">Cambiar teléfono</button>
+                    }} className="text-brand-muted">Cambiar teléfono</button>
                 </div>}
             </>}
             {error && <p role="alert" className="rounded-xl bg-red-50 p-3 text-sm text-red-900">{error}</p>}
-            <Link href="/login" className="block text-center text-sm font-semibold text-stone-700 hover:underline">Volver al inicio de sesión</Link>
+            <Link href="/login" className="block text-center text-sm font-semibold text-brand-muted hover:underline">Volver al inicio de sesión</Link>
         </div>
     </AuthPanel>;
 }

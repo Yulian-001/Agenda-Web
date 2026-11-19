@@ -199,7 +199,7 @@ export default function AppointmentBoard({ mode, initialDate }) {
     return (
         <div className="mx-auto max-w-6xl space-y-5 pb-12">
             <header className="flex items-center gap-3 rounded-3xl border border-stone-200 bg-white p-5 shadow-sm sm:p-6">
-                <span className="shrink-0 rounded-xl bg-stone-950 p-3 text-white"><Icon size={22} aria-hidden="true" /></span>
+                <span className="shrink-0 rounded-xl bg-brand-primary p-3 text-brand-on-primary"><Icon size={22} aria-hidden="true" /></span>
                 <div>
                     <h1 className="text-2xl font-bold text-stone-950">{daily ? 'Reservas Día' : 'Calendario'}</h1>
                     <p className="text-sm text-stone-600">{daily ? 'Consulta las citas de hoy.' : 'Selecciona un día para consultar sus citas.'}</p>

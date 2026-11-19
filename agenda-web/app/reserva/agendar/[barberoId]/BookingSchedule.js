@@ -1,16 +1,16 @@
 'use client';
 
 import { useEffect, useRef, useState } from 'react';
-import Image from 'next/image';
+import BrandLogo from '../../../../components/BrandLogo';
 import Link from 'next/link';
 import { ArrowLeft, CalendarDays, Check, Clock3, Lock, Scissors, UserRound } from 'lucide-react';
 import { announceScheduleChange, watchSchedule } from '../../../../utils/liveSchedule';
 import celebration from './BookingCelebration.module.css';
 import MonthCalendar from '../../../../components/MonthCalendar';
 
-const inputStyle = 'min-h-12 w-full rounded-xl border border-stone-200 bg-stone-50 px-4 py-3 text-base text-stone-950 focus-visible:border-stone-900 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-stone-400';
-const primaryButton = 'flex min-h-12 items-center justify-center rounded-xl bg-stone-950 px-4 py-3 text-center text-sm font-semibold text-white hover:bg-stone-800 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-stone-900 disabled:cursor-not-allowed disabled:bg-stone-200 disabled:text-stone-600';
-const secondaryButton = 'flex min-h-12 items-center justify-center rounded-xl border border-stone-300 bg-white px-4 py-3 text-center text-sm font-semibold text-stone-900 hover:bg-stone-100 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-stone-900 disabled:opacity-50';
+const inputStyle = 'min-h-12 w-full rounded-xl border border-brand-border bg-brand-background px-4 py-3 text-base text-brand-text focus-visible:border-brand-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-accent/55';
+const primaryButton = 'flex min-h-12 items-center justify-center rounded-xl bg-brand-primary px-4 py-3 text-center text-sm font-semibold text-brand-on-primary hover:bg-brand-primary-hover focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-accent disabled:cursor-not-allowed disabled:bg-stone-200 disabled:text-brand-muted';
+const secondaryButton = 'flex min-h-12 items-center justify-center rounded-xl border border-brand-border bg-brand-surface px-4 py-3 text-center text-sm font-semibold text-brand-text hover:bg-brand-background focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-accent disabled:opacity-50';
 
 const dateFormat = new Intl.DateTimeFormat('es-CO', { dateStyle: 'full', timeZone: 'UTC' });
 const priceFormat = new Intl.NumberFormat('es-CO', { style: 'currency', currency: 'COP', minimumFractionDigits: 0, maximumFractionDigits: 0 });
@@ -25,21 +25,21 @@ function BookingSummary({ selection, date, time, customer, price = selection.ser
     if (customer) rows.push({ label: 'Cliente', icon: UserRound, value: customer });
 
     return (
-        <section aria-labelledby="booking-summary-title" className="rounded-2xl border border-stone-200 bg-stone-50 px-4 py-4 sm:px-5">
-            <h2 id="booking-summary-title" className="mb-3 text-sm font-semibold text-stone-950">Resumen de tu cita</h2>
+        <section aria-labelledby="booking-summary-title" className="rounded-2xl border border-brand-border bg-brand-background px-4 py-4 sm:px-5">
+            <h2 id="booking-summary-title" className="mb-3 text-sm font-semibold text-brand-text">Resumen de tu cita</h2>
             <dl className="grid gap-3">
                 {rows.map(({ label, icon: Icon, value, detail, dateTime }) => (
                     <div key={label} className="flex items-center gap-3 text-sm">
-                        <dt className="flex w-22 shrink-0 items-center gap-3 text-stone-600"><Icon aria-hidden="true" size={17} className="shrink-0" /> {label}</dt>
-                        <dd className="min-w-0 flex-1 wrap-break-word font-semibold text-stone-950">
+                        <dt className="flex w-22 shrink-0 items-center gap-3 text-brand-muted"><Icon aria-hidden="true" size={17} className="shrink-0" /> {label}</dt>
+                        <dd className="min-w-0 flex-1 wrap-break-word font-semibold text-brand-text">
                             {dateTime ? <time dateTime={dateTime}>{value}</time> : value}
-                            {detail && <span className="ml-2 whitespace-nowrap text-xs font-normal text-stone-600">{detail}</span>}
+                            {detail && <span className="ml-2 whitespace-nowrap text-xs font-normal text-brand-muted">{detail}</span>}
                         </dd>
                     </div>
                 ))}
-                <div className="mt-0.5 flex items-center justify-between gap-3 border-t border-stone-200 pt-3 text-sm">
-                    <dt className="text-stone-600">Precio</dt>
-                    <dd className="font-semibold text-stone-950">{priceFormat.format(price)}</dd>
+                <div className="mt-0.5 flex items-center justify-between gap-3 border-t border-brand-border pt-3 text-sm">
+                    <dt className="text-brand-muted">Precio</dt>
+                    <dd className="font-semibold text-brand-text">{priceFormat.format(price)}</dd>
                 </div>
             </dl>
         </section>
@@ -182,19 +182,19 @@ export default function BookingSchedule({ barberId, serviceId, selection, today 
     }
 
     return (
-        <main className="min-h-screen bg-[#f5f4f2] px-4 py-6 sm:py-10">
-            <div className="relative mx-auto max-w-lg space-y-6 rounded-[1.75rem] border border-stone-200 bg-white p-5 shadow-sm sm:p-8">
+        <main className="min-h-screen bg-brand-background px-4 py-6 sm:py-10">
+            <div className="relative mx-auto max-w-lg space-y-6 rounded-[1.75rem] border border-brand-border bg-brand-surface p-5 shadow-sm sm:p-8">
                 {!receipt && (reviewing
                     ? <button type="button" disabled={sending} onClick={() => review(false)} aria-label="Volver a fecha y hora"
-                        className="absolute left-5 top-5 rounded-xl bg-stone-100 p-2.5 text-stone-950 hover:bg-stone-200 sm:left-8 sm:top-8"><ArrowLeft size={19} /></button>
-                    : <Link href={back} aria-label={selection ? 'Volver a elegir barbero' : 'Volver a servicios'} className="absolute left-5 top-5 rounded-xl bg-stone-100 p-2.5 text-stone-950 hover:bg-stone-200 sm:left-8 sm:top-8"><ArrowLeft size={19} /></Link>)}
+                        className="absolute left-5 top-5 rounded-xl bg-brand-background p-2.5 text-brand-text hover:bg-brand-tint sm:left-8 sm:top-8"><ArrowLeft size={19} /></button>
+                    : <Link href={back} aria-label={selection ? 'Volver a elegir barbero' : 'Volver a servicios'} className="absolute left-5 top-5 rounded-xl bg-brand-background p-2.5 text-brand-text hover:bg-brand-tint sm:left-8 sm:top-8"><ArrowLeft size={19} /></Link>)}
                 <header className="flex flex-col items-center gap-3 text-center">
-                    <Image src="/logos/LogoSama.png" alt="SAMA" width={68} height={68} className="h-[68px] w-[68px] rounded-full bg-black object-contain" />
+                    <BrandLogo size={68} eager />
                     {receipt && receipt.status !== 'CANCELLED' && <BookingCelebration />}
-                    <h1 ref={heading} tabIndex={-1} className="text-2xl font-bold tracking-tight text-stone-950 focus:outline-none">
+                    <h1 ref={heading} tabIndex={-1} className="text-2xl font-bold tracking-tight text-brand-text focus:outline-none">
                         {receipt ? (receipt.status === 'CANCELLED' ? 'Reserva cancelada' : 'Reserva registrada') : reviewing ? 'Confirma tu reserva' : 'Selecciona fecha y hora'}
                     </h1>
-                    <p className="text-sm text-stone-600">
+                    <p className="text-sm text-brand-muted">
                         {receipt ? (receipt.status === 'PENDING' ? 'Tu cita quedó pendiente de confirmación.' : receipt.cancellationMessage ?? 'Guardamos los datos de tu cita.')
                             : reviewing ? 'Revisa los datos de tu cita antes de confirmar.'
                             : selection ? selection.service.name + ' · ' + selection.barber.name : 'Elige un servicio y un barbero para continuar.'}
@@ -204,7 +204,7 @@ export default function BookingSchedule({ barberId, serviceId, selection, today 
                 {receipt ? (
                     <>
                         <BookingSummary selection={selection} date={receipt.date} time={receipt.time} price={receipt.price} customer={receipt.customer} />
-                        <p className="text-center text-xs text-stone-600">Referencia <span className="block break-all font-mono text-stone-800 sm:inline">{receipt.id}</span></p>
+                        <p className="text-center text-xs text-brand-muted">Referencia <span className="block break-all font-mono text-brand-text sm:inline">{receipt.id}</span></p>
                         <div className="grid gap-2.5 sm:grid-cols-2">
                             <Link href="/reserva" className={primaryButton}>Hacer otra reserva</Link>
                             <Link href="/" className={secondaryButton}>Ir al inicio</Link>
@@ -223,7 +223,7 @@ export default function BookingSchedule({ barberId, serviceId, selection, today 
                         {error && <p role="alert" className="text-sm text-rose-800">{error}</p>}
                     </>
                 ) : !selection ? (
-                    <p className="rounded-2xl bg-stone-50 p-4 text-sm text-stone-700">
+                    <p className="rounded-2xl bg-brand-background p-4 text-sm text-brand-muted">
                         {serviceId ? 'Esta combinación de servicio y barbero ya no está disponible. ' : ''}
                         <Link href={back} className="font-semibold underline">Volver a la selección</Link>.
                     </p>
@@ -231,12 +231,12 @@ export default function BookingSchedule({ barberId, serviceId, selection, today 
                     <>
                         <BookingSummary selection={selection} date={date} time={chosen} />
                         <form onSubmit={reserve} className="space-y-4">
-                            <label className="block space-y-1.5 text-sm font-semibold text-stone-800">
+                            <label className="block space-y-1.5 text-sm font-semibold text-brand-text">
                                 <span>Nombre completo</span>
                                 <input className={inputStyle} name="clientName" autoComplete="name" minLength={2} required disabled={sending}
                                     value={clientName} onChange={event => setClientName(event.target.value)} />
                             </label>
-                            <label className="block space-y-1.5 text-sm font-semibold text-stone-800">
+                            <label className="block space-y-1.5 text-sm font-semibold text-brand-text">
                                 <span>Teléfono</span>
                                 <input className={inputStyle} name="clientPhone" type="tel" autoComplete="tel-national" pattern="[0-9]{10}" maxLength={10} required disabled={sending}
                                     value={clientPhone} onChange={event => setClientPhone(event.target.value)} />
@@ -263,9 +263,9 @@ export default function BookingSchedule({ barberId, serviceId, selection, today 
                                 : <button type="button" className="font-semibold underline" onClick={() => setAttempt(value => value + 1)}>Reintentar</button>}
                         </div>}
                         <section aria-label="Horas de atención" className="space-y-3">
-                            <h2 className="flex items-center gap-2 font-semibold text-stone-950"><Clock3 size={18} /> Horas de atención</h2>
-                            {!date && <p className="rounded-xl bg-stone-50 p-4 text-sm text-stone-700">Elige un día disponible para ver las horas.</p>}
-                            {date && !active && !calendar?.error && <p role="status" className="rounded-xl bg-stone-50 p-4 text-sm text-stone-600">Consultando horarios…</p>}
+                            <h2 className="flex items-center gap-2 font-semibold text-brand-text"><Clock3 size={18} /> Horas de atención</h2>
+                            {!date && <p className="rounded-xl bg-brand-background p-4 text-sm text-brand-muted">Elige un día disponible para ver las horas.</p>}
+                            {date && !active && !calendar?.error && <p role="status" className="rounded-xl bg-brand-background p-4 text-sm text-brand-muted">Consultando horarios…</p>}
                             {unavailableDay && <p role="status" className="rounded-xl bg-amber-50 p-3 text-sm text-amber-900">Ya no quedan horas libres para esta fecha. Elige otro día.</p>}
                             {slots.length > 0 && (
                                 <div className="grid grid-cols-3 gap-2 sm:grid-cols-4">
@@ -274,7 +274,7 @@ export default function BookingSchedule({ barberId, serviceId, selection, today 
                                             onClick={() => { setChosen(slot.timeSlot); setError(''); }}
                                             className={'flex min-h-13 flex-col items-center justify-center rounded-xl border px-1 py-2 text-sm font-semibold tabular-nums ' + (slot.occupied
                                                 ? 'cursor-not-allowed border-rose-300 bg-rose-100 text-rose-950'
-                                                : selected === slot.timeSlot ? 'border-stone-950 bg-stone-950 text-white' : 'border-stone-200 bg-white text-stone-900 hover:border-stone-900')}>
+                                                : selected === slot.timeSlot ? 'border-brand-primary bg-brand-primary text-brand-on-primary' : 'border-brand-border bg-brand-surface text-brand-text hover:border-brand-accent')}>
                                             {slot.timeSlot}
                                             {slot.occupied && <span className="mt-0.5 flex items-center gap-1 text-[11px] leading-tight font-semibold text-rose-900"><Lock aria-hidden="true" size={10} /> Ocupada</span>}
                                         </button>

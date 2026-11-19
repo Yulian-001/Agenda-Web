@@ -7,16 +7,16 @@ const monthFormat = new Intl.DateTimeFormat('es-CO', { month: 'long', year: 'num
 const dayFormat = new Intl.DateTimeFormat('es-CO', { dateStyle: 'full', timeZone: 'UTC' });
 const dayLabels = ['Lu', 'Ma', 'Mi', 'Ju', 'Vi', 'Sá', 'Do'];
 const dayStatus = { available: 'Disponible', full: 'Sin cupos', closed: 'Sin atención', past: 'Fecha pasada' };
-const arrow = 'grid size-9 place-items-center rounded-lg border border-stone-200 bg-white text-stone-900 hover:bg-stone-100 focus-visible:outline-2 focus-visible:outline-offset-2 disabled:cursor-not-allowed disabled:bg-stone-50 disabled:text-stone-400';
+const arrow = 'grid size-9 place-items-center rounded-lg border border-brand-border bg-brand-surface text-brand-text hover:bg-brand-tint focus-visible:outline-2 focus-visible:outline-offset-2 disabled:cursor-not-allowed disabled:bg-brand-background disabled:text-stone-400';
 
 function dayStyle(status, selected, isToday) {
-    if (selected) return 'border-stone-950 bg-stone-950 text-white';
-    if (status === 'calendar') return isToday ? 'border-stone-900 bg-stone-100 text-stone-950' : 'border-stone-200 bg-white text-stone-950 hover:bg-stone-100';
+    if (selected) return 'border-brand-primary bg-brand-primary text-brand-on-primary';
+    if (status === 'calendar') return isToday ? 'border-brand-accent bg-brand-background text-brand-text' : 'border-brand-border bg-brand-surface text-brand-text hover:bg-brand-tint';
     if (status === 'available') {
-        return isToday ? 'border-emerald-600 bg-emerald-50 text-emerald-900 hover:bg-emerald-100' : 'border-stone-200 bg-white text-stone-950 hover:border-emerald-600 hover:bg-emerald-50';
+        return isToday ? 'border-emerald-600 bg-emerald-50 text-emerald-900 hover:bg-emerald-100' : 'border-brand-border bg-brand-surface text-brand-text hover:border-emerald-600 hover:bg-emerald-50';
     }
     if (status === 'full') return 'cursor-not-allowed border-rose-200 bg-rose-100 text-rose-950';
-    return 'cursor-not-allowed border-transparent bg-stone-100 text-stone-500';
+    return 'cursor-not-allowed border-transparent bg-brand-background text-stone-500';
 }
 
 export default function MonthCalendar({ month, today, date, days, error, onMonthChange, onDateChange, mode = 'booking' }) {
@@ -36,18 +36,18 @@ export default function MonthCalendar({ month, today, date, days, error, onMonth
     }
 
     return (
-        <section aria-labelledby="booking-calendar-title" aria-busy={booking && !days && !error} className="space-y-3 rounded-2xl border border-stone-200 bg-stone-50/70 p-3 sm:p-5">
+        <section aria-labelledby="booking-calendar-title" aria-busy={booking && !days && !error} className="space-y-3 rounded-2xl border border-brand-border bg-brand-background/70 p-3 sm:p-5">
             <div className="flex flex-wrap items-center justify-between gap-2">
-                <h2 id="booking-calendar-title" className="flex items-center gap-2 text-sm font-semibold text-stone-950">
+                <h2 id="booking-calendar-title" className="flex items-center gap-2 text-sm font-semibold text-brand-text">
                     <CalendarDays size={17} aria-hidden="true" /> {booking ? 'Fecha de la cita' : 'Selecciona una fecha'}
                 </h2>
-                {booking && days && <span className="text-xs font-medium text-stone-600">{count} {count === 1 ? 'día disponible' : 'días disponibles'}</span>}
+                {booking && days && <span className="text-xs font-medium text-brand-muted">{count} {count === 1 ? 'día disponible' : 'días disponibles'}</span>}
             </div>
             <div className="flex items-center justify-between gap-2">
                 <button type="button" aria-label="Mes anterior" disabled={booking ? month <= today.slice(0, 7) : month === '0001-01'} className={arrow} onClick={() => navigate(-1)}>
                     <ChevronLeft size={18} aria-hidden="true" />
                 </button>
-                <p aria-live="polite" className="text-center text-base font-bold text-stone-950 first-letter:uppercase">{monthFormat.format(start)}</p>
+                <p aria-live="polite" className="text-center text-base font-bold text-brand-text first-letter:uppercase">{monthFormat.format(start)}</p>
                 <button type="button" aria-label="Mes siguiente" disabled={month === '9999-12'} className={arrow} onClick={() => navigate(1)}>
                     <ChevronRight size={18} aria-hidden="true" />
                 </button>
@@ -55,7 +55,7 @@ export default function MonthCalendar({ month, today, date, days, error, onMonth
 
             <div className="grid grid-cols-7 gap-1 text-center sm:gap-1.5">
                 {dayLabels.map((label, index) => (
-                    <abbr key={label} title={weekDays[index][1]} className="py-1 text-xs font-semibold text-stone-600 no-underline">{label}</abbr>
+                    <abbr key={label} title={weekDays[index][1]} className="py-1 text-xs font-semibold text-brand-muted no-underline">{label}</abbr>
                 ))}
                 {Array.from({ length: offset }, (_, index) => <span key={'empty-' + index} aria-hidden="true" />)}
                 {Array.from({ length: dayCount }, (_, index) => {
@@ -80,12 +80,12 @@ export default function MonthCalendar({ month, today, date, days, error, onMonth
                 })}
             </div>
 
-            {booking && !days && !error && <p role="status" className="text-xs text-stone-600">Consultando disponibilidad del mes…</p>}
-            {booking && days && count === 0 && <p role="status" className="text-xs text-stone-700">No hay fechas disponibles en este mes.</p>}
-            {booking && <div className="flex flex-wrap gap-x-3 gap-y-1 border-t border-stone-200 pt-3 text-xs text-stone-700">
+            {booking && !days && !error && <p role="status" className="text-xs text-brand-muted">Consultando disponibilidad del mes…</p>}
+            {booking && days && count === 0 && <p role="status" className="text-xs text-brand-muted">No hay fechas disponibles en este mes.</p>}
+            {booking && <div className="flex flex-wrap gap-x-3 gap-y-1 border-t border-brand-border pt-3 text-xs text-brand-muted">
                 <span><span aria-hidden="true" className="mr-1 inline-block size-2 rounded-full bg-emerald-700" />Disponible</span>
                 <span><span aria-hidden="true" className="mr-1 inline-block h-0.5 w-2.5 align-middle bg-rose-700" />Sin cupos</span>
-                <span><span aria-hidden="true" className="mr-1 inline-block size-2 rounded-sm border border-stone-300 bg-stone-100" />Sin atención o fecha pasada</span>
+                <span><span aria-hidden="true" className="mr-1 inline-block size-2 rounded-sm border border-brand-border bg-brand-background" />Sin atención o fecha pasada</span>
             </div>}
         </section>
     );

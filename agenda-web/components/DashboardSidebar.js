@@ -8,7 +8,8 @@ import {
     Menu, X, CalendarDays, CalendarCheck, User,
     Scissors, Clock, BarChart3, LogOut
 } from 'lucide-react';
-import businessData from '../config/business';
+import BrandLogo from './BrandLogo';
+import business from '../config/business.json';
 import { financeRoles } from '../config/finance';
 
 const menuItems = [
@@ -24,18 +25,15 @@ function SidebarContent({ userName, role, onNavigate }) {
     const pathname = usePathname();
     return (
         <>
-            {/* Logo */}
-            <div className="h-24 flex flex-col items-center justify-center border-b border-gray-700/50 pt-4 shrink-0">
-                <div className="w-16 h-16 bg-white text-[var(--primary)] rounded-full flex items-center justify-center font-black text-xl shadow-lg mb-2">
-                    {businessData.brand.logo.charAt(0)}
-                </div>
-                <span className="text-sm font-bold tracking-widest text-gray-300">SAMA</span>
+            <div className="flex min-h-24 shrink-0 flex-col items-center justify-center gap-1 border-b border-brand-on-primary/15 px-6 py-3 text-center">
+                <BrandLogo size={54} decorative />
+                <span className="wrap-break-word max-w-full text-sm font-bold tracking-wide">{business.brand.name}</span>
             </div>
 
             {/* Bienvenida */}
-            <div className="px-6 py-4 text-center border-b border-gray-700/50 shrink-0">
-                <p className="text-sm text-gray-400">Bienvenido</p>
-                <p className="font-bold text-lg text-white uppercase">{userName}</p>
+            <div className="px-6 py-4 text-center border-b border-brand-on-primary/15 shrink-0">
+                <p className="text-sm text-brand-on-primary/80">Bienvenido</p>
+                <p className="font-bold text-lg text-brand-on-primary uppercase">{userName}</p>
             </div>
 
             {/* Menú */}
@@ -47,10 +45,10 @@ function SidebarContent({ userName, role, onNavigate }) {
                         href={item.path}
                         onClick={onNavigate}
                         aria-current={pathname === item.path ? 'page' : undefined}
-                        className={`flex items-center gap-4 px-4 py-3 rounded-xl hover:bg-white/10 transition-colors text-gray-300 hover:text-white group ${pathname === item.path ? 'bg-white/10 text-white' : ''}`}
+                        className={`flex items-center gap-4 px-4 py-3 rounded-xl hover:bg-brand-on-primary/10 transition-colors text-brand-on-primary/85 hover:text-brand-on-primary group ${pathname === item.path ? 'bg-brand-on-primary/10 text-brand-on-primary' : ''}`}
                     >
-                        <div className="p-2 bg-gray-800/50 rounded-lg group-hover:bg-[var(--primary)] transition-colors">
-                            <item.icon size={20} className="text-white" />
+                        <div className="p-2 bg-brand-on-primary/10 rounded-lg group-hover:bg-brand-on-primary/15 transition-colors">
+                            <item.icon size={20} className="text-brand-on-primary" />
                         </div>
                         <span className="font-medium text-sm">{item.name}</span>
                     </Link>
@@ -58,10 +56,10 @@ function SidebarContent({ userName, role, onNavigate }) {
             </nav>
 
             {/* Cerrar Sesión */}
-            <div className="p-4 border-t border-gray-700/50 shrink-0">
+            <div className="p-4 border-t border-brand-on-primary/15 shrink-0">
                 <a
                     href="/api/auth/logout"
-                    className="flex items-center justify-center gap-3 w-full px-4 py-3 rounded-xl bg-red-500/10 hover:bg-red-500/20 text-red-400 transition-colors"
+                    className="flex items-center justify-center gap-3 w-full px-4 py-3 rounded-xl bg-rose-50 text-rose-900 hover:bg-rose-100 transition-colors"
                 >
                     <LogOut size={18} />
                     <span className="font-semibold text-sm">Cerrar Sesión</span>
@@ -75,10 +73,10 @@ export default function DashboardSidebar({ userName, role, children }) {
     const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
 
     return (
-        <div className="flex h-screen bg-gray-100 font-sans">
+        <div className="flex h-screen bg-brand-background font-sans">
 
             {/* 🖥️ SIDEBAR ESCRITORIO (Fijo) */}
-            <aside className="w-72 bg-[var(--primary)] text-white hidden md:flex flex-col shadow-2xl z-20">
+            <aside className="w-72 bg-brand-primary text-brand-on-primary hidden md:flex flex-col shadow-2xl z-20">
                 <SidebarContent userName={userName} role={role} onNavigate={() => setIsMobileMenuOpen(false)} />
             </aside>
 
@@ -91,11 +89,11 @@ export default function DashboardSidebar({ userName, role, children }) {
 
             {/* 📱 SIDEBAR MÓVIL (Deslizable) */}
             <aside
-                className={`fixed top-0 left-0 h-full w-72 bg-[var(--primary)] text-white z-50 shadow-2xl flex flex-col transition-transform duration-300 md:hidden ${isMobileMenuOpen ? 'translate-x-0' : '-translate-x-full'
+                className={`fixed top-0 left-0 h-full w-72 bg-brand-primary text-brand-on-primary z-50 shadow-2xl flex flex-col transition-transform duration-300 md:hidden ${isMobileMenuOpen ? 'translate-x-0' : '-translate-x-full'
                     }`}
             >
                 <div className="absolute top-4 right-4 z-10">
-                    <button onClick={() => setIsMobileMenuOpen(false)} className="p-2 text-gray-400 hover:text-white rounded-full">
+                    <button onClick={() => setIsMobileMenuOpen(false)} className="p-2 text-brand-on-primary/80 hover:text-brand-on-primary rounded-full">
                         <X size={24} />
                     </button>
                 </div>
@@ -106,22 +104,23 @@ export default function DashboardSidebar({ userName, role, children }) {
             <div className="flex-1 flex flex-col h-full overflow-hidden ">
 
                 {/* 📱 HEADER MÓVIL (Con botón de menú) */}
-                <header className="md:hidden bg-[var(--primary)] h-16 flex items-center justify-between px-6  text-white z-10 shrink-0">
+                <header className="md:hidden bg-brand-primary h-16 flex items-center justify-between px-6  text-brand-on-primary z-10 shrink-0">
                     <div className="flex items-center gap-3 ">
                         <button
                             onClick={() => setIsMobileMenuOpen(true)}
-                            className="p-1 -ml-2 text-white hover:bg-white/10 rounded-lg transition-colors"
+                            className="p-1 -ml-2 text-brand-on-primary hover:bg-brand-on-primary/10 rounded-lg transition-colors"
                         >
                             <Menu size={28} />
                         </button>
                     </div>
-                                            <span className=" font-black tracking-widest">SAMA</span>
-
-                    
+                    <div className="flex min-w-0 items-center gap-2">
+                        <BrandLogo size={34} decorative eager />
+                        <span className="truncate font-bold tracking-wide">{business.brand.name}</span>
+                    </div>
                 </header>
 
                 {/* Área de Trabajo */}
-                <main className="flex-1 overflow-y-auto bg-gray-50 p-4 md:p-6 relative">
+                <main className="flex-1 overflow-y-auto bg-brand-background p-4 md:p-6 relative">
                     {children}
                 </main>
             </div>
