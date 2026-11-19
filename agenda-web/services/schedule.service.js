@@ -73,6 +73,20 @@ export async function loadDailySchedule(db, barberId, date, where = {}) {
     return { ...schedule, scheduleExceptions };
 }
 
+export async function loadScheduleRange(db, barberId, start, end, where) {
+    const schedule = await db.user.findFirst({
+        where: { ...where, id: barberId, state: true, archivedAt: null },
+        select: { businessHours: { select: { day: true, timeSlot: true, isActive: true } } }
+    });
+    if (!schedule) return null;
+
+    const scheduleExceptions = await db.$queryRaw`
+        SELECT "date", "timeSlot", "isActive" FROM "ScheduleException"
+        WHERE "barberId" = ${barberId} AND "date" >= ${start}::date AND "date" < ${end}::date
+    `;
+    return { ...schedule, scheduleExceptions };
+}
+
 function exceptionMap(rows) {
     return new Map(rows.map(row => [row.timeSlot, row.isActive]));
 }
