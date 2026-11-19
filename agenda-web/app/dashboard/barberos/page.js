@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { CheckCircle, Edit, Loader2, Plus, Trash2, User, XCircle } from 'lucide-react';
+import { announceScheduleChange } from '../../../utils/liveSchedule';
 import BarberPhotoField from '../../../components/BarberPhotoField';
 import { teamBarberRoles } from '../../../config/barberRoles';
 
@@ -171,6 +172,7 @@ export default function BarberosPage() {
             });
             setDialog(null);
             setNotice(result.message);
+            announceScheduleChange();
             try {
                 setTeam(await loadBarbers());
                 setLoadError('');

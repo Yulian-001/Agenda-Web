@@ -1,5 +1,7 @@
 // services/auth.service.js
 import bcrypt from 'bcryptjs';
+import { createHmac, randomInt, timingSafeEqual } from 'node:crypto';
+import { accountLockMs, maxCodeFailures, maxLoginFailures, recoveryDurationMs, recoveryResendMs } from '../config/auth';
 import { prisma } from '../utils/prisma';
 import jwt from 'jsonwebtoken';
 import { logger } from '../utils/logger';
@@ -31,102 +33,117 @@ export const createUserService = async (data) => {
     }
 };
 
+async function lockAccount(tx, phone) {
+    const [account] = await tx.$queryRaw`
+        SELECT "id" FROM "User" WHERE "phone" = ${phone} AND "state" = true AND "archivedAt" IS NULL FOR UPDATE
+    `;
+    return account ? tx.user.findUnique({ where: { id: account.id } }) : null;
+}
+
+const invalidCredentials = { statusCode: 401, message: 'Credenciales incorrectas' };
+const lockedAccount = lockUntil => ({
+    statusCode: 403, code: 'ACCOUNT_LOCKED', message: 'Cuenta bloqueada temporalmente por intentos fallidos.', lockUntil
+});
+
 export const loginUserService = async (phone, password) => {
-    // 1. Buscar al usuario con sus datos
-    const user = await prisma.user.findUnique({ where: { phone } });
+    const result = await prisma.$transaction(async tx => {
+        const user = await lockAccount(tx, phone);
+        if (!user) return { error: invalidCredentials };
+        const now = new Date();
+        if (user.lockUntil > now) return { error: lockedAccount(user.lockUntil) };
 
-    if (!user?.state || user.archivedAt) {
-        throw { statusCode: 401, message: 'Credenciales incorrectas' };
-    }
-
-    // 2. Verificar si está bloqueado
-    if (user.lockUntil && user.lockUntil > new Date()) {
-        throw { statusCode: 403, message: 'Cuenta bloqueada temporalmente. Intente más tarde.' };
-    }
-
-    // 3. Comparar contraseñas
-    const isPasswordValid = await bcrypt.compare(password, user.password);
-
-    if (!isPasswordValid) {
-        const failedAttempts = user.failedAttempts + 1;
-        let lockUntil = null;
-
-        if (failedAttempts >= 5) {
-            lockUntil = new Date(Date.now() + 15 * 60 * 1000); // Bloqueo 15 min
+        if (!await bcrypt.compare(password, user.password)) {
+            const failedAttempts = (user.lockUntil ? 0 : user.failedAttempts) + 1;
+            const lockUntil = failedAttempts >= maxLoginFailures ? new Date(Date.now() + accountLockMs) : null;
+            await tx.user.update({ where: { id: user.id }, data: { failedAttempts, lockUntil } });
+            return { error: lockUntil ? lockedAccount(lockUntil) : invalidCredentials };
         }
 
-        await prisma.user.update({
-            where: { id: user.id },
-            data: { failedAttempts, lockUntil }
-        });
+        await tx.user.update({ where: { id: user.id }, data: { failedAttempts: 0, lockUntil: null } });
+        return { user };
+    });
+    if (result.error) throw result.error;
 
-        throw { statusCode: 401, message: 'Credenciales incorrectas' };
+    const { id, role, name, photo } = result.user;
+    const token = jwt.sign({ id, role, name }, process.env.JWT_SECRET, { expiresIn: '1d' });
+    return { token, user: { id, role, name, photo } };
+};
+
+function codeDigest(phone, code) {
+    return createHmac('sha256', process.env.JWT_SECRET).update('password-recovery:' + phone + ':' + code).digest();
+}
+
+function ensureRecoveryAvailable() {
+    if (process.env.NODE_ENV === 'production') {
+        throw { statusCode: 503, message: 'La recuperación por código todavía no está disponible. Contacta al administrador.' };
     }
+}
 
-    // 4. Login exitoso: Resetear intentos
-    await prisma.user.update({
-        where: { id: user.id },
-        data: { failedAttempts: 0, lockUntil: null }
+export const generateOTPService = async phone => {
+    ensureRecoveryAvailable();
+    const result = await prisma.$transaction(async tx => {
+        const account = await lockAccount(tx, phone);
+        const now = Date.now();
+        if (!account) return { expiresAt: new Date(now + recoveryDurationMs), resendAt: new Date(now + recoveryResendMs) };
+
+        const previous = await tx.passwordResetToken.findFirst({
+            where: { phone }, orderBy: { createdAt: 'desc' }, select: { createdAt: true, expiresAt: true }
+        });
+        if (previous && previous.createdAt.getTime() + recoveryResendMs > now) {
+            return { expiresAt: previous.expiresAt, resendAt: new Date(previous.createdAt.getTime() + recoveryResendMs) };
+        }
+
+        const code = String(randomInt(1000000)).padStart(6, '0');
+        const expiresAt = new Date(now + recoveryDurationMs);
+        await tx.passwordResetToken.updateMany({ where: { phone, used: false }, data: { used: true } });
+        await tx.passwordResetToken.create({
+            data: { phone, otpCode: codeDigest(phone, code).toString('hex'), expiresAt }
+        });
+        return { code, expiresAt, resendAt: new Date(now + recoveryResendMs) };
     });
 
-    // 5. Generar el JWT
-    const token = jwt.sign(
-        { id: user.id, role: user.role, name: user.name },
-        process.env.JWT_SECRET,
-        { expiresIn: '1d' } // El token dura 1 día
-    );
-
-    // 6. Devolver los datos (sin contraseña) y el token
+    if (result.code) logger.dev(`OTP PARA ${phone}: [ ${result.code} ]`);
     return {
-        token,
-        user: {
-            id: user.id,
-            name: user.name,
-            role: user.role,
-            photo: user.photo
-        }
+        message: 'Si el teléfono está registrado, el código de prueba aparece en la terminal de desarrollo.',
+        expiresAt: result.expiresAt, resendAt: result.resendAt
     };
 };
 
-export const generateOTPService = async (phone) => {
-    const user = await prisma.user.findUnique({ where: { phone } });
-    if (!user || user.archivedAt) throw { statusCode: 404, message: 'Teléfono no registrado' };
+async function processRecoveryCode(phone, otpCode, newPassword) {
+    ensureRecoveryAvailable();
+    const result = await prisma.$transaction(async tx => {
+        const account = await lockAccount(tx, phone);
+        const now = new Date();
+        const token = account && await tx.passwordResetToken.findFirst({
+            where: { phone, used: false, expiresAt: { gt: now }, createdAt: { gt: new Date(now.getTime() - recoveryDurationMs) } },
+            orderBy: { createdAt: 'desc' }
+        });
+        if (!token) return { error: { statusCode: 400, code: 'CODE_UNAVAILABLE', message: 'El código venció o ya fue utilizado. Solicita uno nuevo.' } };
 
-    const otpCode = Math.floor(100000 + Math.random() * 900000).toString();
-    const expiresAt = new Date(Date.now() + 15 * 60 * 1000); // 15 minutos
+        const stored = Buffer.from(token.otpCode, 'hex');
+        const expected = codeDigest(phone, otpCode);
+        if (stored.length !== expected.length || !timingSafeEqual(stored, expected)) {
+            const failedAttempts = token.failedAttempts + 1;
+            const used = failedAttempts >= maxCodeFailures;
+            await tx.passwordResetToken.update({ where: { id: token.id }, data: { failedAttempts, used } });
+            return { error: {
+                statusCode: 400, code: used ? 'CODE_UNAVAILABLE' : 'INVALID_CODE',
+                message: used ? 'Agotaste los intentos. Solicita un código nuevo.' : 'El código ingresado es incorrecto.'
+            } };
+        }
 
-    // Limpiamos tokens anteriores no usados de este teléfono
-    await prisma.passwordResetToken.deleteMany({ where: { phone, used: false } });
-
-    await prisma.passwordResetToken.create({
-        data: { phone, otpCode, expiresAt }
+        if (newPassword === undefined) return { message: 'Código verificado', expiresAt: token.expiresAt };
+        const password = await bcrypt.hash(newPassword, 10);
+        if (token.expiresAt <= new Date() || token.createdAt.getTime() + recoveryDurationMs <= Date.now()) {
+            return { error: { statusCode: 400, code: 'CODE_UNAVAILABLE', message: 'El código venció. Solicita uno nuevo.' } };
+        }
+        await tx.user.update({ where: { id: account.id }, data: { password, failedAttempts: 0, lockUntil: null } });
+        await tx.passwordResetToken.update({ where: { id: token.id }, data: { used: true } });
+        return { message: 'Contraseña actualizada' };
     });
-    
-    logger.dev(`OTP PARA ${phone}: [ ${otpCode} ]`);
+    if (result.error) throw result.error;
+    return result;
+}
 
-    return { message: "Código de recuperación enviado" };
-};
-
-export const resetPasswordService = async (phone, otpCode, newPassword) => {
-    const token = await prisma.passwordResetToken.findFirst({
-        where: { phone, otpCode, used: false, expiresAt: { gte: new Date() } }
-    });
-
-    if (!token) throw { statusCode: 400, message: 'Código inválido o expirado' };
-
-    const hashedPassword = await bcrypt.hash(newPassword, 10);
-
-    // Actualizamos la contraseña y marcamos el token como usado
-    await prisma.$transaction([
-        prisma.user.update({
-            where: { phone, archivedAt: null },
-            data: { password: hashedPassword, failedAttempts: 0, lockUntil: null }
-        }),
-        prisma.passwordResetToken.update({
-            where: { id: token.id },
-            data: { used: true }
-        })
-    ]);
-
-    return { message: "Contraseña actualizada exitosamente" };
-};
+export const verifyRecoveryCodeService = (phone, otpCode) => processRecoveryCode(phone, otpCode);
+export const resetPasswordService = (phone, otpCode, newPassword) => processRecoveryCode(phone, otpCode, newPassword);

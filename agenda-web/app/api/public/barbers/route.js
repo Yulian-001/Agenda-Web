@@ -1,37 +1,15 @@
-// app/api/public/barbers/route.js
 import { NextResponse } from 'next/server';
-import { prisma } from '../../../../utils/prisma';
+import { getPublicServiceBarbers } from '../../../../services/service.service';
 import { handleApiError } from '../../../../utils/errorHandler';
 
 export async function GET(request) {
     try {
-        const { searchParams } = new URL(request.url);
-        const serviceId = searchParams.get('serviceId');
+        const serviceId = request.nextUrl.searchParams.get('serviceId');
+        if (!serviceId) return NextResponse.json({ error: 'Falta el ID del servicio' }, { status: 400 });
 
-        if (!serviceId) {
-            return NextResponse.json({ error: "Falta el ID del servicio" }, { status: 400 });
-        }
-
-        // Buscamos usuarios activos que tengan ese servicio asignado
-        const barbers = await prisma.user.findMany({
-            where: {
-                state: true,
-                archivedAt: null,
-                role: { in: ['ADMIN', 'BARBER_BOSS', 'BARBER_AFFILIATE', 'BARBER_INDEPENDENT'] },
-                services: {
-                    some: { serviceId: serviceId } // Filtro clave
-                }
-            },
-            select: {
-                id: true,
-                name: true,
-                photo: true,
-                description: true
-            }
-        });
-
-        return NextResponse.json({ barbers }, { status: 200 });
+        const selection = await getPublicServiceBarbers(serviceId);
+        return NextResponse.json(selection, { headers: { 'Cache-Control': 'no-store' } });
     } catch (error) {
-        return handleApiError(error, "Error obteniendo barberos públicos");
+        return handleApiError(error, 'Error obteniendo barberos públicos');
     }
 }

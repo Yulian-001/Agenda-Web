@@ -44,6 +44,7 @@ model User {
     haveWhatsApp Boolean @default(true)
     
     commissionRate Float @default(0.70) 
+    settlementDirection String @default("BUSINESS_PAYS_BARBER")
     
     failedAttempts Int @default(0)
     lockUntil DateTime?
@@ -65,6 +66,7 @@ model Services {
     duration Int 
     price Float
     isActive Boolean @default(true) 
+    archivedAt DateTime?
     
     createdAt DateTime @default(now())
     updatedAt DateTime @updatedAt
@@ -89,6 +91,8 @@ model Appointment {
     timeSlot String 
     state AppointmentState @default(PENDING)
     priceAtBooking Float 
+    commissionRateApplied Float?
+    settlementDirectionApplied String?
     
     clientId String
     client Clients @relation(fields: [clientId], references: [id], onDelete: Restrict) 
@@ -150,6 +154,9 @@ model HistoryAppointment {
     id String @id @default(uuid())
     state AppointmentState 
     changedAt DateTime @default(now()) 
+    actorUserId String?
+    actorName String?
+    actorRole String?
 
     barberId String
     barber User @relation(fields: [barberId], references: [id], onDelete: Cascade)
@@ -167,5 +174,6 @@ model PasswordResetToken {
     otpCode   String
     expiresAt DateTime
     used      Boolean  @default(false)
+    failedAttempts Int @default(0)
     createdAt DateTime @default(now())
 }

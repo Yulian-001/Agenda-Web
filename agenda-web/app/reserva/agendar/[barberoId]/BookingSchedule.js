@@ -6,7 +6,7 @@ import Link from 'next/link';
 import { ArrowLeft, CalendarDays, Check, Clock3, Lock, Scissors, UserRound } from 'lucide-react';
 import { announceScheduleChange, watchSchedule } from '../../../../utils/liveSchedule';
 import celebration from './BookingCelebration.module.css';
-import BookingCalendar from './BookingCalendar';
+import MonthCalendar from '../../../../components/MonthCalendar';
 
 const inputStyle = 'min-h-12 w-full rounded-xl border border-stone-200 bg-stone-50 px-4 py-3 text-base text-stone-950 focus-visible:border-stone-900 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-stone-400';
 const primaryButton = 'flex min-h-12 items-center justify-center rounded-xl bg-stone-950 px-4 py-3 text-center text-sm font-semibold text-white hover:bg-stone-800 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-stone-900 disabled:cursor-not-allowed disabled:bg-stone-200 disabled:text-stone-600';
@@ -69,6 +69,7 @@ export default function BookingSchedule({ barberId, serviceId, selection, today 
     const [error, setError] = useState('');
     const [sending, setSending] = useState(false);
     const [receipt, setReceipt] = useState(null);
+    const [confirmCancel, setConfirmCancel] = useState(false);
     const [attempt, setAttempt] = useState(0);
     const heading = useRef(null);
     const headingPending = useRef(false);
@@ -95,7 +96,7 @@ export default function BookingSchedule({ barberId, serviceId, selection, today 
                 const res = await fetch('/api/public/availability?' + query.toString(), { signal, cache: 'no-store' });
                 const data = await res.json();
                 if (!signal.aborted) {
-                    setResponse(res.ok ? data : { month, error: data.error });
+                    setResponse(res.ok ? data : { month, error: data.error, code: data.code });
                 }
             } catch {
                 if (!signal.aborted) setResponse({ month, error: 'No se pudo consultar la disponibilidad.' });
@@ -137,6 +138,7 @@ export default function BookingSchedule({ barberId, serviceId, selection, today 
             });
             const data = await res.json();
             if (!res.ok) {
+                if (data.code === 'SELECTION_UNAVAILABLE') setResponse({ month, error: data.error, code: data.code });
                 const fieldError = Object.values(data.details ?? {}).find(field => field?._errors?.length);
                 setError(fieldError?._errors[0] || data.error || 'No se pudo agendar la cita.');
                 setAttempt(value => value + 1);
@@ -157,6 +159,28 @@ export default function BookingSchedule({ barberId, serviceId, selection, today 
         }
     }
 
+    async function cancelReservation() {
+        if (sending) return;
+        setSending(true);
+        setError('');
+        try {
+            const response = await fetch('/api/public/appointments/' + encodeURIComponent(receipt.id) + '/cancel', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ clientPhone: clientPhone.trim() })
+            });
+            const data = await response.json();
+            if (!response.ok) throw new Error(data.error || 'No se pudo cancelar la reserva.');
+            headingPending.current = true;
+            setReceipt({ ...receipt, status: 'CANCELLED', cancellationMessage: data.message });
+            announceScheduleChange();
+        } catch (failure) {
+            setError(failure.message);
+        } finally {
+            setSending(false);
+        }
+    }
+
     return (
         <main className="min-h-screen bg-[#f5f4f2] px-4 py-6 sm:py-10">
             <div className="relative mx-auto max-w-lg space-y-6 rounded-[1.75rem] border border-stone-200 bg-white p-5 shadow-sm sm:p-8">
@@ -166,12 +190,12 @@ export default function BookingSchedule({ barberId, serviceId, selection, today 
                     : <Link href={back} aria-label={selection ? 'Volver a elegir barbero' : 'Volver a servicios'} className="absolute left-5 top-5 rounded-xl bg-stone-100 p-2.5 text-stone-950 hover:bg-stone-200 sm:left-8 sm:top-8"><ArrowLeft size={19} /></Link>)}
                 <header className="flex flex-col items-center gap-3 text-center">
                     <Image src="/logos/LogoSama.png" alt="SAMA" width={68} height={68} className="h-[68px] w-[68px] rounded-full bg-black object-contain" />
-                    {receipt && <BookingCelebration />}
+                    {receipt && receipt.status !== 'CANCELLED' && <BookingCelebration />}
                     <h1 ref={heading} tabIndex={-1} className="text-2xl font-bold tracking-tight text-stone-950 focus:outline-none">
-                        {receipt ? 'Reserva registrada' : reviewing ? 'Confirma tu reserva' : 'Selecciona fecha y hora'}
+                        {receipt ? (receipt.status === 'CANCELLED' ? 'Reserva cancelada' : 'Reserva registrada') : reviewing ? 'Confirma tu reserva' : 'Selecciona fecha y hora'}
                     </h1>
                     <p className="text-sm text-stone-600">
-                        {receipt ? (receipt.status === 'PENDING' ? 'Tu cita quedó pendiente de confirmación.' : 'Guardamos los datos de tu cita.')
+                        {receipt ? (receipt.status === 'PENDING' ? 'Tu cita quedó pendiente de confirmación.' : receipt.cancellationMessage ?? 'Guardamos los datos de tu cita.')
                             : reviewing ? 'Revisa los datos de tu cita antes de confirmar.'
                             : selection ? selection.service.name + ' · ' + selection.barber.name : 'Elige un servicio y un barbero para continuar.'}
                     </p>
@@ -185,6 +209,18 @@ export default function BookingSchedule({ barberId, serviceId, selection, today 
                             <Link href="/reserva" className={primaryButton}>Hacer otra reserva</Link>
                             <Link href="/" className={secondaryButton}>Ir al inicio</Link>
                         </div>
+                        {['PENDING', 'CONFIRMED'].includes(receipt.status) && (confirmCancel ?
+                            <div className="space-y-3 rounded-xl border border-rose-200 bg-rose-50 p-4 text-sm text-rose-950">
+                                <p>Si cancelas con menos de 12 horas de anticipación, se registrará una falta. Las faltas reiteradas pueden bloquear futuras reservas.</p>
+                                <div className="flex flex-wrap gap-3">
+                                    <button type="button" disabled={sending} onClick={() => setConfirmCancel(false)} className="font-semibold underline">Conservar reserva</button>
+                                    <button type="button" disabled={sending} onClick={cancelReservation} className="rounded-lg bg-rose-800 px-3 py-2 font-semibold text-white disabled:opacity-50">
+                                        {sending ? 'Cancelando…' : 'Confirmar cancelación'}
+                                    </button>
+                                </div>
+                            </div> :
+                            <button type="button" onClick={() => setConfirmCancel(true)} className="mx-auto block text-sm font-semibold text-rose-800 underline">Cancelar esta reserva</button>)}
+                        {error && <p role="alert" className="text-sm text-rose-800">{error}</p>}
                     </>
                 ) : !selection ? (
                     <p className="rounded-2xl bg-stone-50 p-4 text-sm text-stone-700">
@@ -209,6 +245,7 @@ export default function BookingSchedule({ barberId, serviceId, selection, today 
                                 {unavailableDay ? 'Ya no quedan horas libres para esta fecha. Vuelve para elegir otro día.' : 'La hora elegida dejó de estar disponible. Vuelve para elegir otra.'}
                             </p>}
                             {(error || calendar?.error) && <p role="alert" className="rounded-xl bg-rose-50 p-3 text-sm text-rose-900">{error || calendar.error}</p>}
+                            {calendar?.code === 'SELECTION_UNAVAILABLE' && <Link href={back} className="inline-block text-sm font-semibold underline">Elegir otro barbero</Link>}
                             <div className="grid gap-2.5 pt-1">
                                 <button type="submit" disabled={!selected || sending} className={primaryButton}>{sending ? 'Agendando…' : 'Confirmar reserva'}</button>
                                 <button type="button" disabled={sending} className={secondaryButton} onClick={() => review(false)}>Volver a fecha y hora</button>
@@ -217,11 +254,13 @@ export default function BookingSchedule({ barberId, serviceId, selection, today 
                     </>
                 ) : (
                     <>
-                        <BookingCalendar month={month} today={today} date={date} days={calendar?.days} error={calendar?.error}
+                        <MonthCalendar month={month} today={today} date={date} days={calendar?.days} error={calendar?.error}
                             onMonthChange={changeMonth} onDateChange={selectDate} />
                         {calendar?.error && <div role="alert" className="flex flex-wrap items-center justify-between gap-2 rounded-xl bg-rose-50 p-3 text-sm text-rose-900">
                             <p>{calendar.error}</p>
-                            <button type="button" className="font-semibold underline" onClick={() => setAttempt(value => value + 1)}>Reintentar</button>
+                            {calendar.code === 'SELECTION_UNAVAILABLE'
+                                ? <Link href={back} className="font-semibold underline">Elegir otro barbero</Link>
+                                : <button type="button" className="font-semibold underline" onClick={() => setAttempt(value => value + 1)}>Reintentar</button>}
                         </div>}
                         <section aria-label="Horas de atención" className="space-y-3">
                             <h2 className="flex items-center gap-2 font-semibold text-stone-950"><Clock3 size={18} /> Horas de atención</h2>

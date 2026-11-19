@@ -1,0 +1,1 @@
+ALTER TABLE "Services" ADD COLUMN IF NOT EXISTS "archivedAt" TIMESTAMP(3);

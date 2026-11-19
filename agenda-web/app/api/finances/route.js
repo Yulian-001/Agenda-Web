@@ -22,7 +22,7 @@ export async function GET(request) {
         return NextResponse.json({
             message: "Reporte financiero generado exitosamente",
             data: finances
-        }, { status: 200 });
+        }, { headers: { 'Cache-Control': 'no-store' } });
 
     } catch (error) {
         return handleApiError(error, "Error en Finanzas");

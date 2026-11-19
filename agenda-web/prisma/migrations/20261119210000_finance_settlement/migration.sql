@@ -1,0 +1,4 @@
+ALTER TABLE "User" ADD COLUMN IF NOT EXISTS "settlementDirection" TEXT NOT NULL DEFAULT 'BUSINESS_PAYS_BARBER';
+ALTER TABLE "Appointment"
+    ADD COLUMN IF NOT EXISTS "commissionRateApplied" DOUBLE PRECISION,
+    ADD COLUMN IF NOT EXISTS "settlementDirectionApplied" TEXT;

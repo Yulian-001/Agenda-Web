@@ -3,6 +3,7 @@ import { NextResponse } from 'next/server';
 import { verifyAuth } from '../../../utils/auth';
 import { serviceSchema } from '../../../utils/validations';
 import { createServiceService, getServicesService } from '../../../services/service.service'; 
+import { handleApiError } from '../../../utils/errorHandler';
 
 
 export async function POST(request) {
@@ -41,18 +42,19 @@ export async function POST(request) {
     }
 }
 
-export async function GET() {
+export async function GET(request) {
     try {
-        const services = await getServicesService();
+        const includeInactive = request.nextUrl.searchParams.get('includeInactive') === 'true';
+        if (includeInactive) await verifyAuth(['ADMIN']);
+        const services = await getServicesService(includeInactive);
 
         return NextResponse.json({
             message: "Servicios obtenidos exitosamente",
             count: services.length,
             services
-        }, { status: 200 });
+        }, { headers: { 'Cache-Control': 'no-store' } });
 
     } catch (error) {
-        console.error("Error al listar servicios:", error);
-        return NextResponse.json({ error: "Error interno del servidor" }, { status: 500 });
+        return handleApiError(error, 'Error al listar servicios');
     }
 }

@@ -8,7 +8,7 @@ export default async function AgendarPage({ params, searchParams }) {
     const serviceId = typeof serviceParam === 'string' ? serviceParam : '';
     const [today] = scheduleNow();
     const selection = serviceId ? await prisma.servicesBarbers.findFirst({
-        where: { barberId, serviceId, service: { isActive: true }, barber: { state: true, archivedAt: null } },
+        where: { barberId, serviceId, service: { isActive: true, archivedAt: null }, barber: { state: true, archivedAt: null } },
         select: {
             barber: { select: { name: true } },
             service: { select: { name: true, price: true, duration: true } }

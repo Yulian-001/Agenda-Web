@@ -1,9 +1,11 @@
 // app/api/auth/logout/route.js
 import { NextResponse } from 'next/server';
 
-export async function GET(request) {
-    // Creamos una redirección a /login y le borramos la cookie al pasar
-    const response = NextResponse.redirect(new URL('/login', request.url));
+export async function GET() {
+    const response = new NextResponse(null, {
+        status: 307,
+        headers: { Location: '/login' }
+    });
 
     response.cookies.set({
         name: 'token',

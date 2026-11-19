@@ -13,6 +13,7 @@ const barberSelect = {
     commissionRate: true,
     state: true,
     services: {
+        where: { service: { archivedAt: null } },
         select: { service: { select: { id: true, name: true, isActive: true } } }
     }
 };
@@ -45,7 +46,7 @@ export async function getServiceAssignments(tx, serviceIds) {
     const ids = [...new Set(serviceIds)];
     if (ids.length === 0) return [];
 
-    const count = await tx.services.count({ where: { id: { in: ids }, isActive: true } });
+    const count = await tx.services.count({ where: { id: { in: ids }, isActive: true, archivedAt: null } });
     if (count !== ids.length) {
         throw { statusCode: 400, message: 'Solo se pueden asignar servicios activos del catálogo.' };
     }
@@ -64,10 +65,10 @@ export const updateBarberService = (id, data, teamOnly) => prisma.$transaction(a
         const current = await tx.servicesBarbers.findMany({ where: { barberId: id }, select: { serviceId: true } });
         const assigned = new Set(current.map(item => item.serviceId));
         const added = await getServiceAssignments(tx, services.filter(serviceId => !assigned.has(serviceId)));
-        profile.services = {
-            deleteMany: { serviceId: { notIn: services } },
-            createMany: { data: added }
-        };
+        await tx.servicesBarbers.deleteMany({
+            where: { barberId: id, serviceId: { notIn: services }, service: { archivedAt: null } }
+        });
+        profile.services = { createMany: { data: added } };
     }
 
     return tx.user.update({ where: { id }, data: profile, select: barberSelect });
