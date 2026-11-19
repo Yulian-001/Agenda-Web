@@ -8,7 +8,7 @@ export default async function BarberosPage({ params }) {
     const { serviceId } = resolvedParams;
 
     const service = await prisma.services.findUnique({
-        where: { id: serviceId },
+        where: { id: serviceId, isActive: true },
         include: {
             barbers: { include: { barber: true } }
         }
@@ -19,7 +19,7 @@ export default async function BarberosPage({ params }) {
     // Filtramos solo los barberos que están activos
     const activeBarbers = service.barbers
         .map(sb => sb.barber)
-        .filter(barber => barber.state === true);
+        .filter(barber => barber.state && !barber.archivedAt);
 
     return (
         <main className="min-h-screen w-full lg:max-w-full bg-gray-100 flex justify-center items-center font-sans md:p-6">
@@ -68,7 +68,7 @@ export default async function BarberosPage({ params }) {
 
                                     {/* Botón de acción (Ocupa un buen ancho para que sea fácil de tocar) */}
                                     <Link
-                                        href={`/reserva/agendar/${barber.id}`}
+                                        href={{ pathname: '/reserva/agendar/' + barber.id, query: { serviceId } }}
                                         className="w-full max-w-[200px] bg-black text-white py-3 rounded-xl text-sm font-semibold hover:bg-gray-800 transition-colors"
                                     >
                                         Elegir Barbero

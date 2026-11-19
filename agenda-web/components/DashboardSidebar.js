@@ -3,26 +3,25 @@
 
 import { useState } from 'react';
 import Link from 'next/link';
+import { usePathname } from 'next/navigation';
 import {
     Menu, X, CalendarDays, CalendarCheck, User,
     Scissors, Clock, BarChart3, LogOut
 } from 'lucide-react';
 import businessData from '../config/business';
 
-export default function DashboardSidebar({ userName, children }) {
-    const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+const menuItems = [
+    { name: 'Calendario', icon: CalendarDays, path: '/dashboard' },
+    { name: 'Reservas Día', icon: CalendarCheck, path: '/dashboard/reservas' },
+    { name: 'Barberos', icon: User, path: '/dashboard/barberos' },
+    { name: 'Servicios', icon: Scissors, path: '/dashboard/servicios' },
+    { name: 'Agenda', icon: Clock, path: '/dashboard/agenda', adminOnly: true },
+    { name: 'Contabilidad', icon: BarChart3, path: '/dashboard/contabilidad' },
+];
 
-    const menuItems = [
-        { name: 'Calendario', icon: CalendarDays, path: '/dashboard' },
-        { name: 'Reservas Día', icon: CalendarCheck, path: '/dashboard/reservas' },
-        { name: 'Barberos', icon: User, path: '/dashboard/barberos' },
-        { name: 'Servicios', icon: Scissors, path: '/dashboard/servicios' },
-        { name: 'Agenda', icon: Clock, path: '/dashboard/agenda' },
-        { name: 'Contabilidad', icon: BarChart3, path: '/dashboard/contabilidad' },
-    ];
-
-    // Extraemos el contenido del menú para no duplicar código entre Desktop y Mobile
-    const SidebarContent = () => (
+function SidebarContent({ userName, role, onNavigate }) {
+    const pathname = usePathname();
+    return (
         <>
             {/* Logo */}
             <div className="h-24 flex flex-col items-center justify-center border-b border-gray-700/50 pt-4 shrink-0">
@@ -40,12 +39,13 @@ export default function DashboardSidebar({ userName, children }) {
 
             {/* Menú */}
             <nav className="flex-1 py-4 px-3 flex flex-col gap-2 overflow-y-auto">
-                {menuItems.map((item) => (
+                {menuItems.filter(item => !item.adminOnly || role === 'ADMIN').map((item) => (
                     <Link
                         key={item.name}
                         href={item.path}
-                        onClick={() => setIsMobileMenuOpen(false)} // Cierra el menú al hacer clic en móvil
-                        className="flex items-center gap-4 px-4 py-3 rounded-xl hover:bg-white/10 transition-colors text-gray-300 hover:text-white group"
+                        onClick={onNavigate}
+                        aria-current={pathname === item.path ? 'page' : undefined}
+                        className={`flex items-center gap-4 px-4 py-3 rounded-xl hover:bg-white/10 transition-colors text-gray-300 hover:text-white group ${pathname === item.path ? 'bg-white/10 text-white' : ''}`}
                     >
                         <div className="p-2 bg-gray-800/50 rounded-lg group-hover:bg-[var(--primary)] transition-colors">
                             <item.icon size={20} className="text-white" />
@@ -57,23 +57,27 @@ export default function DashboardSidebar({ userName, children }) {
 
             {/* Cerrar Sesión */}
             <div className="p-4 border-t border-gray-700/50 shrink-0">
-                <Link
+                <a
                     href="/api/auth/logout"
                     className="flex items-center justify-center gap-3 w-full px-4 py-3 rounded-xl bg-red-500/10 hover:bg-red-500/20 text-red-400 transition-colors"
                 >
                     <LogOut size={18} />
                     <span className="font-semibold text-sm">Cerrar Sesión</span>
-                </Link>
+                </a>
             </div>
         </>
     );
+}
+
+export default function DashboardSidebar({ userName, role, children }) {
+    const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
 
     return (
         <div className="flex h-screen bg-gray-100 font-sans">
 
             {/* 🖥️ SIDEBAR ESCRITORIO (Fijo) */}
             <aside className="w-72 bg-[var(--primary)] text-white hidden md:flex flex-col shadow-2xl z-20">
-                <SidebarContent />
+                <SidebarContent userName={userName} role={role} onNavigate={() => setIsMobileMenuOpen(false)} />
             </aside>
 
             {/* 📱 BACKDROP MÓVIL (Fondo oscuro para cerrar al tocar) */}
@@ -93,7 +97,7 @@ export default function DashboardSidebar({ userName, children }) {
                         <X size={24} />
                     </button>
                 </div>
-                <SidebarContent />
+                <SidebarContent userName={userName} role={role} onNavigate={() => setIsMobileMenuOpen(false)} />
             </aside>
 
             {/* 🟢 CONTENIDO PRINCIPAL */}

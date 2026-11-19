@@ -1,80 +1,95 @@
-// services/user.service.js
 import { prisma } from '../utils/prisma';
+import { teamBarberRoles } from '../config/barberRoles';
+import { barberPhotoSchema } from '../utils/validations';
 
-export const getBarbersService = async () => {
-    // Buscamos a todos los usuarios que no sean solo Admins (a menos que también corten pelo)
-    return await prisma.user.findMany({
-        where: {
-            role: { in: ['ADMIN', 'BARBER_BOSS', 'BARBER_AFFILIATE', 'BARBER_INDEPENDENT'] },
-            // ❌ ELIMINADO: state: true (Ahora traemos a todos, activos e inactivos)
-        },
-        select: {
-            id: true,
-            name: true,
-            phone: true,
-            photo: true,
-            role: true,
-            description: true,
-            commissionRate: true,
-            state: true, // ✅ AGREGADO: Necesitamos el estado para pintar el badge en el Frontend
-            services: {
-                select: {
-                    service: { select: { id: true, name: true } }
-                }
-            }
-        }
-    });
+const barberSelect = {
+    id: true,
+    name: true,
+    phone: true,
+    photo: true,
+    role: true,
+    description: true,
+    haveWhatsApp: true,
+    commissionRate: true,
+    state: true,
+    services: {
+        select: { service: { select: { id: true, name: true, isActive: true } } }
+    }
 };
 
-export const updateBarberService = async (id, data) => {
-    const user = await prisma.user.findUnique({ where: { id } });
-    if (!user) throw { statusCode: 404, message: 'Usuario no encontrado' };
+export const getBarbersService = () => prisma.user.findMany({
+    where: { archivedAt: null, role: { in: Object.keys(teamBarberRoles) } },
+    select: barberSelect,
+    orderBy: [{ name: 'asc' }, { id: 'asc' }]
+});
 
-    // Si envían servicios, manejamos la relación N:M
-    const updateData = { ...data };
-    delete updateData.services; // Lo sacamos temporalmente
+async function lockBarber(tx, id, teamOnly) {
+    // Coordina las bajas con las reservas en curso y los cambios de perfil.
+    const [barber] = await tx.$queryRaw`
+        SELECT "role", "photo" FROM "User" WHERE "id" = ${id} AND "archivedAt" IS NULL FOR UPDATE
+    `;
+    if (!barber || (teamOnly && !Object.hasOwn(teamBarberRoles, barber.role))) {
+        throw { statusCode: 404, message: 'Usuario no encontrado' };
+    }
+    return barber;
+}
 
-    if (data.services && Array.isArray(data.services)) {
-        // Borramos las asignaciones anteriores
-        await prisma.servicesBarbers.deleteMany({ where: { barberId: id } });
+export async function ensureBarberInOperation(tx, id) {
+    const [barber] = await tx.$queryRaw`
+        SELECT "id" FROM "User" WHERE "id" = ${id} AND "archivedAt" IS NULL FOR SHARE
+    `;
+    if (!barber) throw { statusCode: 404, message: 'Barbero no encontrado.' };
+}
 
-        // Creamos las nuevas asignaciones
-        updateData.services = {
-            create: data.services.map(serviceId => ({
-                service: { connect: { id: serviceId } }
-            }))
+export async function getServiceAssignments(tx, serviceIds) {
+    const ids = [...new Set(serviceIds)];
+    if (ids.length === 0) return [];
+
+    const count = await tx.services.count({ where: { id: { in: ids }, isActive: true } });
+    if (count !== ids.length) {
+        throw { statusCode: 400, message: 'Solo se pueden asignar servicios activos del catálogo.' };
+    }
+
+    return ids.map(serviceId => ({ serviceId }));
+}
+
+export const updateBarberService = (id, data, teamOnly) => prisma.$transaction(async tx => {
+    const barber = await lockBarber(tx, id, teamOnly);
+    const { services, ...profile } = data;
+    if (teamOnly && !barberPhotoSchema.safeParse(profile.photo ?? barber.photo).success) {
+        throw { statusCode: 400, message: 'Agrega una foto válida antes de guardar o reactivar al barbero.' };
+    }
+
+    if (services !== undefined) {
+        const current = await tx.servicesBarbers.findMany({ where: { barberId: id }, select: { serviceId: true } });
+        const assigned = new Set(current.map(item => item.serviceId));
+        const added = await getServiceAssignments(tx, services.filter(serviceId => !assigned.has(serviceId)));
+        profile.services = {
+            deleteMany: { serviceId: { notIn: services } },
+            createMany: { data: added }
         };
     }
 
-    return await prisma.user.update({
-        where: { id },
-        data: updateData
-    });
-};
+    return tx.user.update({ where: { id }, data: profile, select: barberSelect });
+});
 
-export const deleteUserService = async (id) => {
-    const user = await prisma.user.findUnique({ where: { id } });
-    if (!user) throw { statusCode: 404, message: 'Usuario no encontrado' };
-
-    // 🛡️ Evitar desactivar si tiene citas futuras (Lógica intacta)
-    const futureAppointments = await prisma.appointment.count({
+export const deactivateBarberService = (id, { archive = false } = {}) => prisma.$transaction(async tx => {
+    await lockBarber(tx, id, true);
+    const openAppointments = await tx.appointment.count({
         where: {
             barberId: id,
-            date: { gte: new Date() },
             state: { in: ['PENDING', 'CONFIRMED'] }
         }
     });
 
-    if (futureAppointments > 0) {
+    if (openAppointments) {
         throw {
-            statusCode: 400,
-            message: `No se puede desactivar al barbero porque tiene ${futureAppointments} citas pendientes. Cancele o reasigne primero.`
+            statusCode: 409,
+            message: `El barbero tiene ${openAppointments} citas pendientes o confirmadas. Cancélalas antes de ${archive ? 'eliminarlo' : 'desactivarlo'}.`
         };
     }
 
-    // Si pasa, hacemos el Soft Delete (Lógica intacta)
-    return await prisma.user.update({
-        where: { id },
-        data: { state: false }
-    });
-};
+    const data = { state: false };
+    if (archive) data.archivedAt = new Date();
+    return tx.user.update({ where: { id }, data, select: barberSelect });
+});

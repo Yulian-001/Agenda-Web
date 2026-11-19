@@ -39,6 +39,7 @@ model User {
     role Role 
     photo String
     state Boolean @default(true)
+    archivedAt DateTime?
     description String
     haveWhatsApp Boolean @default(true)
     
@@ -51,6 +52,7 @@ model User {
     updatedAt DateTime @updatedAt
 
     businessHours BusinessHour[]
+    scheduleExceptions ScheduleException[]
     appointmentBarber Appointment[] @relation("AppointmentBarber")
     historyAppointment HistoryAppointment[]
     services ServicesBarbers[]
@@ -131,6 +133,17 @@ model BusinessHour {
     barber User @relation(fields: [barberId], references: [id], onDelete: Cascade)
 
     @@unique([barberId, day, timeSlot])
+}
+
+model ScheduleException {
+    barberId String
+    date DateTime @db.Date
+    /// An empty slot represents the entire date.
+    timeSlot String
+    isActive Boolean
+    barber User @relation(fields: [barberId], references: [id], onDelete: Restrict)
+
+    @@id([barberId, date, timeSlot])
 }
 
 model HistoryAppointment {

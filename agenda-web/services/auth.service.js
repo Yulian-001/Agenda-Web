@@ -3,60 +3,39 @@ import bcrypt from 'bcryptjs';
 import { prisma } from '../utils/prisma';
 import jwt from 'jsonwebtoken';
 import { logger } from '../utils/logger';
+import { getServiceAssignments } from './user.service';
 
 
 
 export const createUserService = async (data) => {
-    const { name, phone, password, role, photo, description, haveWhatsApp, services } = data;
-
-    // 1. Verificar si el usuario ya existe
-    const existingUser = await prisma.user.findUnique({ where: { phone } });
-    if (existingUser) {
-        // Usamos un objeto de error personalizado para manejarlo en el controlador
-        throw { statusCode: 409, message: 'Este número de teléfono ya está registrado' };
-    }
-
-    // 2. Hashear la contraseña
+    const { password, services = [], ...profile } = data;
     const hashedPassword = await bcrypt.hash(password, 10);
 
-    // 3. Crear el usuario y conectar los servicios (Relación N:M)
-    // Usamos 'connect' para asociar los IDs de servicios que ya existen en la BD
-    const newUser = await prisma.user.create({
-        data: {
-            name: name.trim(),
-            phone: phone.trim(),
-            password: hashedPassword,
-            role,
-            photo,
-            description,
-            haveWhatsApp,
-            services: {
-                create: services.map(serviceId => ({
-                    service: { connect: { id: serviceId } }
-                }))
-            }
-        },
-        select: {
-            id: true,
-            name: true,
-            phone: true,
-            role: true,
-            createdAt: true
-            // NUNCA devolvemos la contraseña
+    try {
+        return await prisma.$transaction(async tx => {
+            const assignments = await getServiceAssignments(tx, services);
+            return tx.user.create({
+                data: {
+                    ...profile,
+                    password: hashedPassword,
+                    services: { createMany: { data: assignments } }
+                },
+                select: { id: true, name: true, phone: true, role: true, createdAt: true }
+            });
+        });
+    } catch (error) {
+        if (error.code === 'P2002') {
+            throw { statusCode: 409, message: 'Este número de teléfono ya está registrado' };
         }
-    });
-
-    return newUser;
+        throw error;
+    }
 };
-
-//* Validacion TOKEN JWT
-
 
 export const loginUserService = async (phone, password) => {
     // 1. Buscar al usuario con sus datos
     const user = await prisma.user.findUnique({ where: { phone } });
 
-    if (!user) {
+    if (!user?.state || user.archivedAt) {
         throw { statusCode: 401, message: 'Credenciales incorrectas' };
     }
 
@@ -111,7 +90,7 @@ export const loginUserService = async (phone, password) => {
 
 export const generateOTPService = async (phone) => {
     const user = await prisma.user.findUnique({ where: { phone } });
-    if (!user) throw { statusCode: 404, message: 'Teléfono no registrado' };
+    if (!user || user.archivedAt) throw { statusCode: 404, message: 'Teléfono no registrado' };
 
     const otpCode = Math.floor(100000 + Math.random() * 900000).toString();
     const expiresAt = new Date(Date.now() + 15 * 60 * 1000); // 15 minutos
@@ -140,7 +119,7 @@ export const resetPasswordService = async (phone, otpCode, newPassword) => {
     // Actualizamos la contraseña y marcamos el token como usado
     await prisma.$transaction([
         prisma.user.update({
-            where: { phone },
+            where: { phone, archivedAt: null },
             data: { password: hashedPassword, failedAttempts: 0, lockUntil: null }
         }),
         prisma.passwordResetToken.update({
@@ -150,50 +129,4 @@ export const resetPasswordService = async (phone, otpCode, newPassword) => {
     ]);
 
     return { message: "Contraseña actualizada exitosamente" };
-};
-
-
-// 1. NUEVA FUNCIÓN: Crear un Barbero desde el Panel de Admin
-export const createBarberService = async (data) => {
-    const { name, phone, password, role, photo, description, haveWhatsApp } = data;
-
-    const existingUser = await prisma.user.findUnique({ where: { phone } });
-    if (existingUser) throw { statusCode: 409, message: 'Este número de teléfono ya está registrado' };
-
-    const hashedPassword = await bcrypt.hash(password, 10);
-
-    return await prisma.user.create({
-        data: {
-            name: name.trim(),
-            phone: phone.trim(),
-            password: hashedPassword,
-            role,
-            photo,
-            description,
-            haveWhatsApp,
-        },
-        select: { id: true, name: true, phone: true, role: true, createdAt: true }
-    });
-};
-
-// 2. NUEVA FUNCIÓN: Eliminar Definitivo (Solo si no tiene citas pendientes)
-export const hardDeleteUserService = async (id) => {
-    const user = await prisma.user.findUnique({ where: { id } });
-    if (!user) throw { statusCode: 404, message: 'Usuario no encontrado' };
-
-    // Validamos que no tenga citas futuras antes de borrar de la BD
-    const futureAppointments = await prisma.appointment.count({
-        where: {
-            barberId: id,
-            date: { gte: new Date() },
-            state: { in: ['PENDING', 'CONFIRMED'] }
-        }
-    });
-
-    if (futureAppointments > 0) {
-        throw { statusCode: 400, message: `No se puede eliminar porque tiene ${futureAppointments} citas pendientes.` };
-    }
-
-    // Si no hay citas, lo borramos de verdad (Hard Delete)
-    return await prisma.user.delete({ where: { id } });
 };
