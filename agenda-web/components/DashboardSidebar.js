@@ -27,7 +27,7 @@ export default function DashboardSidebar({ userName, children }) {
             {/* Logo */}
             <div className="h-24 flex flex-col items-center justify-center border-b border-gray-700/50 pt-4 shrink-0">
                 <div className="w-16 h-16 bg-white text-[var(--primary)] rounded-full flex items-center justify-center font-black text-xl shadow-lg mb-2">
-                    {businessData.brand.logoText.charAt(0)}
+                    {businessData.brand.logo.charAt(0)}
                 </div>
                 <span className="text-sm font-bold tracking-widest text-gray-300">SAMA</span>
             </div>
@@ -97,22 +97,21 @@ export default function DashboardSidebar({ userName, children }) {
             </aside>
 
             {/* 🟢 CONTENIDO PRINCIPAL */}
-            <div className="flex-1 flex flex-col h-full overflow-hidden">
+            <div className="flex-1 flex flex-col h-full overflow-hidden ">
 
                 {/* 📱 HEADER MÓVIL (Con botón de menú) */}
-                <header className="md:hidden bg-[var(--primary)] h-16 flex items-center justify-between px-6 text-white z-10 shrink-0">
-                    <div className="flex items-center gap-3">
+                <header className="md:hidden bg-[var(--primary)] h-16 flex items-center justify-between px-6  text-white z-10 shrink-0">
+                    <div className="flex items-center gap-3 ">
                         <button
                             onClick={() => setIsMobileMenuOpen(true)}
                             className="p-1 -ml-2 text-white hover:bg-white/10 rounded-lg transition-colors"
                         >
                             <Menu size={28} />
                         </button>
-                        <span className="font-black tracking-widest">SAMA</span>
                     </div>
-                    <Link href="/api/auth/logout" className="text-red-400 hover:text-red-300">
-                        <LogOut size={24} />
-                    </Link>
+                                            <span className=" font-black tracking-widest">SAMA</span>
+
+                    
                 </header>
 
                 {/* Área de Trabajo */}

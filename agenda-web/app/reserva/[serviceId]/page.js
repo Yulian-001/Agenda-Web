@@ -22,7 +22,7 @@ export default async function BarberosPage({ params }) {
         .filter(barber => barber.state === true);
 
     return (
-        <main className="min-h-screen w-full bg-gray-100 flex justify-center items-center font-sans md:p-6">
+        <main className="min-h-screen w-full lg:max-w-full bg-gray-100 flex justify-center items-center font-sans md:p-6">
             {/* Contenedor principal un poco más ancho (max-w-lg) para que las tarjetas respiren mejor */}
             <div className="w-full max-w-lg bg-gray-50 min-h-screen md:min-h-[800px] md:rounded-3xl md:shadow-2xl p-6 overflow-y-auto">
 
@@ -44,13 +44,13 @@ export default async function BarberosPage({ params }) {
                     {activeBarbers.length === 0 ? (
                         <p className="text-center text-gray-500 mt-10">No hay barberos disponibles para este servicio aún.</p>
                     ) : (
-                        activeBarbers.map((barber) => (
+                        activeBarbers.map((barber) => (                            
                             <div
                                 key={barber.id}
-                                className="bg-white p-6 rounded-3xl shadow-sm border border-gray-100 flex flex-col items-center text-center transition-all hover:shadow-md"
+                                className=" p-6 rounded-3xl shadow-sm border border-gray-100 flex  flex-row-reverse justify-between items-center text-center transition-all hover:shadow-md"
                             >
                                 {/* Foto del Barbero (más grande y centrada) */}
-                                <div className="w-28 h-28 bg-gray-100 rounded-full flex-shrink-0 overflow-hidden mb-4 border-4 border-white shadow-inner">
+                                <div className="w-40 h-40 bg-gray-100 rounded-xl flex-shrink-0 overflow-hidden ml-2 mb-2 border-4 border-white shadow-inner">
                                     {barber.photo ? (
                                         <img src={barber.photo} alt={barber.name} className="w-full h-full object-cover" />
                                     ) : (
@@ -58,19 +58,22 @@ export default async function BarberosPage({ params }) {
                                     )}
                                 </div>
 
-                                {/* Información */}
-                                <h3 className="font-bold text-xl text-gray-800 mb-1">{barber.name}</h3>
-                                <p className="text-sm text-gray-500 mb-6 px-4">
-                                    {barber.description || 'Profesional listo para atenderte'}
-                                </p>
+                                <div className='flex flex-col justify-center items-center gap-4  '>
 
-                                {/* Botón de acción (Ocupa un buen ancho para que sea fácil de tocar) */}
-                                <Link
-                                    href={`/reserva/agendar/${barber.id}`}
-                                    className="w-full max-w-[200px] bg-black text-white py-3 rounded-xl text-sm font-semibold hover:bg-gray-800 transition-colors"
-                                >
-                                    Elegir Barbero
-                                </Link>
+                                    {/* Información */}
+                                    <h3 className="font-bold text-xl text-gray-800 mb-1">{barber.name}</h3>
+                                    <p className="text-sm text-gray-500 mb-4 mx-4   ">
+                                        {barber.description || 'Profesional listo para atenderte'}
+                                    </p>
+
+                                    {/* Botón de acción (Ocupa un buen ancho para que sea fácil de tocar) */}
+                                    <Link
+                                        href={`/reserva/agendar/${barber.id}`}
+                                        className="w-full max-w-[200px] bg-black text-white py-3 rounded-xl text-sm font-semibold hover:bg-gray-800 transition-colors"
+                                    >
+                                        Elegir Barbero
+                                    </Link>
+                                </div>
                             </div>
                         ))
                     )}
