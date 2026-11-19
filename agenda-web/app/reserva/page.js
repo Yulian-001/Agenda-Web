@@ -9,8 +9,8 @@ export default async function ReservaPage() {
     });
 
     return (
-        <main className="min-h-screen w-full bg-gray-100 flex justify-center items-center font-sans md:p-6">
-            <div className="w-full max-w-md bg-gray-50 min-h-screen md:min-h-[800px] md:rounded-3xl md:shadow-2xl p-6 overflow-y-auto">
+        <main className="min-h-screen w-full bg-gray-50 flex justify-center items-center font-sans md:p-6">
+            <div className="w-full max-w-2xl lg:max-w-6xl bg-white min-h-screen md:min-h-[800px] md:rounded-3xl md:shadow-2xl p-6 overflow-y-auto transition-all duration-300 ease-in-out">
 
                 <div className="flex items-center mb-8 pt-2">
                     <Link href="/" className="p-2 bg-white rounded-full shadow-sm mr-4 hover:bg-gray-100">
@@ -19,7 +19,7 @@ export default async function ReservaPage() {
                     <h1 className="text-2xl font-bold">Nuestros Servicios</h1>
                 </div>
 
-                <div className="flex flex-col gap-4 pb-8">
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 pb-8 ">
                     {services.map((service) => (
                         <div key={service.id} className="bg-white p-5 rounded-2xl shadow-sm border border-gray-100">
                             <h3 className="text-xl font-bold mb-2">{service.name}</h3>

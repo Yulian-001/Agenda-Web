@@ -1,23 +1,32 @@
-// app/api/users/route.js
 import { NextResponse } from 'next/server';
-import { verifyAuth } from '../../../utils/auth';
+import { createUserService } from '../../../services/auth.service';
 import { getBarbersService } from '../../../services/user.service';
+import { verifyAuth } from '../../../utils/auth';
+import { handleApiError } from '../../../utils/errorHandler';
+import { createBarberSchema } from '../../../utils/validations';
 
 export async function GET() {
     try {
-        // Admin y Boss pueden ver la lista completa de la barbería
-        await verifyAuth(['ADMIN', 'BARBER_BOSS']);
-
+        const viewer = await verifyAuth(['ADMIN', 'BARBER_BOSS']);
         const barbers = await getBarbersService();
-
-        return NextResponse.json({
-            message: "Barberos obtenidos exitosamente",
-            count: barbers.length,
-            barbers
-        }, { status: 200 });
-
+        return NextResponse.json({ count: barbers.length, barbers, viewerId: viewer.id });
     } catch (error) {
-        if (error.statusCode) return NextResponse.json({ error: error.message }, { status: error.statusCode });
-        return NextResponse.json({ error: "Error interno" }, { status: 500 });
+        return handleApiError(error, 'Error al listar barberos');
+    }
+}
+
+export async function POST(request) {
+    try {
+        await verifyAuth(['ADMIN', 'BARBER_BOSS']);
+        const body = await request.json().catch(() => null);
+        const validation = createBarberSchema.safeParse(body);
+        if (!validation.success) {
+            return NextResponse.json({ error: 'Datos inválidos', details: validation.error.format() }, { status: 400 });
+        }
+
+        const barber = await createUserService(validation.data);
+        return NextResponse.json({ message: 'Barbero creado exitosamente', barber }, { status: 201 });
+    } catch (error) {
+        return handleApiError(error, 'Error al crear barbero');
     }
 }

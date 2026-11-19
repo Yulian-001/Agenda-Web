@@ -1,77 +1,87 @@
 // services/appointment.service.js
 import { prisma } from '../utils/prisma';
 import { logger } from '../utils/logger';
+import { ensureBarberInOperation } from './user.service';
 
-const getDayOfWeekEnum = (dateString) => {
-    const date = new Date(dateString + 'T00:00:00');
-    const days = ['SUNDAY', 'MONDAY', 'TUESDAY', 'WEDNESDAY', 'THURSDAY', 'FRIDAY', 'SATURDAY'];
-    return days[date.getDay()];
-};
+import { civilDate, scheduleNow, slotKey } from '../config/schedule';
+import { dailySlots, loadDailySchedule } from './schedule.service';
 
 export const createAppointmentService = async (data) => {
-    const { clientName, clientPhone, barberId, serviceId, date, timeSlot } = data;
-
-    // ANTI-SABOTAJE (Cliente baneado o bloqueado)
-    let client = await prisma.clients.findUnique({ where: { phone: clientPhone } });
-
-    if (client) {
-        if (client.isBanned) {
-            throw { statusCode: 403, message: 'Este número está bloqueado permanentemente por cancelaciones reiteradas.' };
-        }
-        if (client.blockedUntil && client.blockedUntil > new Date()) {
-            throw { statusCode: 403, message: `Este número está bloqueado temporalmente hasta el ${client.blockedUntil.toLocaleDateString()}.` };
-        }
+    const { clientName, clientPhone, barberId, serviceId, date } = data;
+    const timeSlot = slotKey(data.timeSlot);
+    const bookingDate = civilDate(date);
+    const [today, now] = scheduleNow();
+    if (date < today || (date === today && timeSlot < now)) {
+        throw { statusCode: 400, message: 'Ese horario ya pasó.' };
     }
-
-    // 2. Validar que el Barbero tenga habilitada esa hora en su agenda
-    const dayEnum = getDayOfWeekEnum(date);
-    const businessHour = await prisma.businessHour.findFirst({
-        where: { barberId, day: dayEnum, timeSlot, isActive: true }
-    });
-    if (!businessHour) throw { statusCode: 400, message: 'El barbero no está disponible en este horario.' };
-
-    // 3. Obtener servicio
-    const service = await prisma.services.findUnique({ where: { id: serviceId } });
-    if (!service) throw { statusCode: 404, message: 'Servicio no encontrado' };
-
-    // 4. Buscar o crear el cliente
-    if (!client) {
-        client = await prisma.clients.create({
-            data: { name: clientName, phone: clientPhone }
-        });
-    }
-
-    // 5. Crear la cita (Atrapando error de concurrencia P2002)
-    const dateObj = new Date(date + 'T00:00:00Z');
 
     try {
-        const newAppointment = await prisma.appointment.create({
-            data: {
-                date: dateObj, timeSlot, priceAtBooking: service.price,
-                clientId: client.id, barberId, serviceId,
+        const appointment = await prisma.$transaction(async tx => {
+            // La reserva mantiene activo al profesional hasta que termine su escritura.
+            const [barber] = await tx.$queryRaw`
+                SELECT "id" FROM "User" WHERE "id" = ${barberId} AND "state" = true AND "archivedAt" IS NULL FOR SHARE
+            `;
+            if (!barber) throw { statusCode: 400, message: 'El barbero no está disponible.' };
+
+            let client = await tx.clients.findUnique({ where: { phone: clientPhone } });
+            if (client?.isBanned) {
+                throw { statusCode: 403, message: 'Este número está bloqueado permanentemente por cancelaciones reiteradas.' };
             }
+            if (client?.blockedUntil > new Date()) {
+                throw { statusCode: 403, message: `Este número está bloqueado temporalmente hasta el ${client.blockedUntil.toLocaleDateString()}.` };
+            }
+
+            const schedule = await loadDailySchedule(tx, barberId, bookingDate);
+            const enabled = dailySlots(schedule).some(slot => slot.timeSlot === timeSlot && slot.isActive);
+            if (!enabled) throw { statusCode: 400, message: 'El barbero no está disponible en este horario.' };
+
+            const timeVariants = timeSlot.startsWith('0') ? [timeSlot, timeSlot.slice(1)] : [timeSlot];
+            const booked = await tx.appointment.findFirst({
+                where: { barberId, date: bookingDate, timeSlot: { in: timeVariants } },
+                select: { id: true }
+            });
+            if (booked) throw { statusCode: 409, message: 'Este horario ya está ocupado.' };
+
+            const service = await tx.services.findFirst({
+                where: { id: serviceId, isActive: true, barbers: { some: { barberId } } },
+                select: { name: true, price: true }
+            });
+            if (!service) throw { statusCode: 400, message: 'El barbero no tiene asignado este servicio activo.' };
+
+            if (!client) {
+                client = await tx.clients.upsert({
+                    where: { phone: clientPhone },
+                    create: { name: clientName, phone: clientPhone },
+                    update: { phone: clientPhone }
+                });
+            }
+
+            const newAppointment = await tx.appointment.create({
+                data: {
+                    date: bookingDate,
+                    timeSlot,
+                    priceAtBooking: service.price,
+                    clientId: client.id,
+                    barberId,
+                    serviceId,
+                    historyAppointment: { create: { state: 'PENDING', barberId, serviceId } }
+                }
+            });
+            return { data: newAppointment, serviceName: service.name };
         });
-
-        await prisma.historyAppointment.create({
-            data: { state: 'PENDING', barberId, appointmentId: newAppointment.id, serviceId }
-        });
-
-        // Simulación WhatsApp
-        logger.dev(`📱 WhatsApp a ${clientPhone}: Hola ${clientName}, tu cita para ${service.name} ha sido agendada.`);
-
-        return newAppointment;
+        logger.dev(`📱 WhatsApp a ${clientPhone}: Hola ${clientName}, tu cita para ${appointment.serviceName} ha sido agendada.`);
+        return appointment.data;
     } catch (error) {
-        // Manejo de Concurrencia (Doble reserva)
         if (error.code === 'P2002') {
             throw { statusCode: 409, message: 'Este horario acaba de ser ocupado por otro cliente. Por favor elige otro.' };
         }
-        throw error; // Si es otro error, lo lanzamos
+        throw error;
     }
 };
 
 export const getAppointmentsService = async (user, filters) => {
     const { date, view } = filters;
-    let whereClause = {};
+    const whereClause = { barber: { archivedAt: null } };
 
     if (date) {
         const startOfDay = new Date(date + 'T00:00:00.000Z');
@@ -113,16 +123,18 @@ export const updateAppointmentStatusService = async (appointmentId, newState, us
         throw { statusCode: 403, message: 'No tienes permiso para modificar esta cita.' };
     }
 
-    const updated = await prisma.appointment.update({
-        where: { id: appointmentId },
-        data: { state: newState }
+    return prisma.$transaction(async tx => {
+        await ensureBarberInOperation(tx, appointment.barberId);
+        return tx.appointment.update({
+            where: { id: appointmentId },
+            data: {
+                state: newState,
+                historyAppointment: {
+                    create: { state: newState, barberId: appointment.barberId, serviceId: appointment.serviceId }
+                }
+            }
+        });
     });
-
-    await prisma.historyAppointment.create({
-        data: { state: newState, barberId: appointment.barberId, appointmentId: appointment.id, serviceId: appointment.serviceId }
-    });
-
-    return updated;
 };
 
 //  Cancelación Pública por parte del Cliente (Aplica Strikes)

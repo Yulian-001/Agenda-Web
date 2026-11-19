@@ -16,6 +16,7 @@ export async function GET(request) {
         const barbers = await prisma.user.findMany({
             where: {
                 state: true,
+                archivedAt: null,
                 role: { in: ['ADMIN', 'BARBER_BOSS', 'BARBER_AFFILIATE', 'BARBER_INDEPENDENT'] },
                 services: {
                     some: { serviceId: serviceId } // Filtro clave

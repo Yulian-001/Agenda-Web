@@ -1,8 +1,9 @@
 // config/business.js
+
 const businessData = {
     brand: {
         name: "SAMA",
-        logoText: "SAMA",
+        logo: "/LogoSama.png",
         heroTitle: "Experiencia premium profesional.",
         heroSubtitle: "Agenda tu cita en línea y disfruta de nuestros servicios.",
         address: "Av. Principal 123, Ciudad"

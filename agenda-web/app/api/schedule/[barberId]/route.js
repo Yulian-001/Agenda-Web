@@ -1,104 +1,34 @@
-// app/api/schedule/[barberId]/route.js
 import { NextResponse } from 'next/server';
 import { verifyAuth } from '../../../../utils/auth';
-import {
-    getScheduleService,
-    toggleDayService,
-    toggleHourService
-} from '../../../../services/schedule.service';
-import { toggleDaySchema, toggleHourSchema } from '../../../../utils/validations';
-import { prisma } from '../../../../utils/prisma';
+import { handleApiError } from '../../../../utils/errorHandler';
+import { dailyScheduleSchema, scheduleDateSchema } from '../../../../utils/validations';
+import { getIndividualSchedule, updateIndividualSchedule } from '../../../../services/schedule.service';
 
 export async function GET(request, { params }) {
     try {
-        const payload = await verifyAuth();
+        await verifyAuth(['ADMIN']);
         const { barberId } = await params;
-
-        if (payload.role === 'BARBER_AFFILIATE') {
-            return NextResponse.json({ error: "Acceso denegado." }, { status: 403 });
-        }
-
-        const schedule = await getScheduleService(barberId);
-        return NextResponse.json({ schedule }, { status: 200 });
+        const date = scheduleDateSchema.safeParse(request.nextUrl.searchParams.get('date'));
+        if (!date.success) return NextResponse.json({ error: 'Selecciona una fecha válida.' }, { status: 400 });
+        return NextResponse.json(await getIndividualSchedule(barberId, date.data));
     } catch (error) {
-        if (error.statusCode) return NextResponse.json({ error: error.message }, { status: error.statusCode });
-        return NextResponse.json({ error: "Error interno" }, { status: 500 });
+        return handleApiError(error, 'Error al consultar la agenda individual');
     }
 }
 
 export async function PUT(request, { params }) {
     try {
-        const payload = await verifyAuth();
+        await verifyAuth(['ADMIN']);
         const { barberId } = await params;
-
-        const isAdminOrBoss = ['ADMIN', 'BARBER_BOSS'].includes(payload.role);
-        const isSelfIndependent = payload.role === 'BARBER_INDEPENDENT' && payload.id === barberId;
-
-        if (!isAdminOrBoss && !isSelfIndependent) {
-            return NextResponse.json({
-                error: "Acceso denegado. No tienes permiso para modificar esta agenda."
-            }, { status: 403 });
-        }
-
-        const body = await request.json();
-
-        if (body.timeSlot) {
-            const validation = toggleHourSchema.safeParse(body);
-            if (!validation.success) return NextResponse.json({ error: "Datos inválidos", details: validation.error.format() }, { status: 400 });
-
-            await toggleHourService(barberId, body.day, body.timeSlot, body.isActive);
-            return NextResponse.json({ message: `Hora ${body.timeSlot} actualizada.` }, { status: 200 });
-        } else {
-            const validation = toggleDaySchema.safeParse(body);
-            if (!validation.success) return NextResponse.json({ error: "Datos inválidos", details: validation.error.format() }, { status: 400 });
-
-            await toggleDayService(barberId, body.day, body.isActive);
-            return NextResponse.json({ message: `Día ${body.day} actualizado.` }, { status: 200 });
-        }
-
-    } catch (error) {
-        if (error.statusCode) return NextResponse.json({ error: error.message }, { status: error.statusCode });
-        return NextResponse.json({ error: "Error interno" }, { status: 500 });
-    }
-}
-
-
-export async function POST(request, { params }) {
-    try {
-        // Solo Admin o Boss pueden generar la agenda base
-        await verifyAuth(['ADMIN', 'BARBER_BOSS']);
-
-        const resolvedParams = await params;
-        const { barberId } = resolvedParams;
-
-        const days = ['TUESDAY', 'WEDNESDAY', 'THURSDAY', 'FRIDAY', 'SATURDAY', 'SUNDAY'];
-        const hours = [
-            "08:00", "09:00", "10:00", "11:00", "12:00",
-            "14:00", "15:00", "16:00", "17:00", "18:00", "19:00", "20:00", "21:00", "22:00"
-        ];
-
-        const dataToInsert = [];
-
-        for (const day of days) {
-            for (const timeSlot of hours) {
-                dataToInsert.push({
-                    barberId,
-                    day,
-                    timeSlot,
-                    isActive: true
-                });
-            }
-        }
-
-        // Insertamos en la base de datos
-        await prisma.businessHour.createMany({
-            data: dataToInsert,
-            skipDuplicates: true // Evita errores si ya existen
+        const validation = dailyScheduleSchema.safeParse(await request.json().catch(() => null));
+        if (!validation.success) return NextResponse.json({ error: 'Selecciona una fecha y los horarios que quieres ajustar.' }, { status: 400 });
+        await updateIndividualSchedule(barberId, validation.data);
+        return NextResponse.json({
+            message: 'Agenda individual actualizada para la fecha seleccionada.',
+            schedule: await getIndividualSchedule(barberId, validation.data.date)
         });
-
-        return NextResponse.json({ message: "Agenda por defecto generada exitosamente" }, { status: 201 });
     } catch (error) {
-        if (error.statusCode) return NextResponse.json({ error: error.message }, { status: error.statusCode });
-        return NextResponse.json({ error: "Error interno" }, { status: 500 });
+        if (error.conflicts) return NextResponse.json({ error: error.message, conflicts: error.conflicts }, { status: 409 });
+        return handleApiError(error, 'Error al guardar la agenda individual');
     }
 }

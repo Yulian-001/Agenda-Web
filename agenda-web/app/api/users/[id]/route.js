@@ -1,74 +1,56 @@
-// app/api/users/[id]/route.js
 import { NextResponse } from 'next/server';
 import { verifyAuth } from '../../../../utils/auth';
-import { updateBarberService, deleteUserService } from '../../../../services/user.service';
-import { updateUserSchema } from '../../../../utils/validations';
-import { handleApiError } from '../../../../utils/errorHandler'; 
+import { deactivateBarberService, updateBarberService } from '../../../../services/user.service';
+import { updateOwnProfileSchema, updateUserSchema } from '../../../../utils/validations';
+import { handleApiError } from '../../../../utils/errorHandler';
 
-// PUT: Actualizar usuario
 export async function PUT(request, { params }) {
     try {
-        const resolvedParams = await params;
-        const { id } = resolvedParams;
-
-        const payload = await verifyAuth();
-
-        const isAdminOrBoss = ['ADMIN', 'BARBER_BOSS'].includes(payload.role);
-        const isSelf = payload.id === id;
-
-        if (!isAdminOrBoss && !isSelf) {
-            return NextResponse.json({
-                error: "Acceso denegado. No puedes modificar el perfil de otro usuario."
-            }, { status: 403 });
+        const actor = await verifyAuth();
+        const { id } = await params;
+        const canManage = ['ADMIN', 'BARBER_BOSS'].includes(actor.role);
+        const isSelf = actor.id === id;
+        if (!canManage && !isSelf) {
+            return NextResponse.json({ error: 'Acceso denegado.' }, { status: 403 });
         }
 
-        const body = await request.json();
-
-        // Validación estricta con Zod
-        const validation = updateUserSchema.safeParse(body);
+        const body = await request.json().catch(() => null);
+        const validation = (canManage ? updateUserSchema : updateOwnProfileSchema).safeParse(body);
         if (!validation.success) {
-            return NextResponse.json({ error: "Datos inválidos", details: validation.error.format() }, { status: 400 });
+            return NextResponse.json({ error: 'Datos inválidos', details: validation.error.format() }, { status: 400 });
         }
 
-        const updated = await updateBarberService(id, validation.data);
+        const { state, role, ...profile } = validation.data;
+        if (isSelf && (state === false || (role && role !== actor.role))) {
+            return NextResponse.json({ error: 'No puedes desactivar tu cuenta ni cambiar tu propio rol.' }, { status: 400 });
+        }
 
-        return NextResponse.json({
-            message: "Barbero actualizado exitosamente",
-            barber: updated
-        }, { status: 200 });
+        if (state === false) {
+            if (role || Object.keys(profile).length) {
+                return NextResponse.json({ error: 'Guarda la edición del perfil y la desactivación por separado.' }, { status: 400 });
+            }
+            const barber = await deactivateBarberService(id);
+            return NextResponse.json({ message: 'Barbero desactivado', barber });
+        }
 
+        const barber = await updateBarberService(id, validation.data, canManage);
+        return NextResponse.json({ message: 'Barbero actualizado exitosamente', barber });
     } catch (error) {
-        return handleApiError(error, "Error en PUT user");
+        return handleApiError(error, 'Error al actualizar barbero');
     }
 }
 
-// DELETE: Soft Delete (Desactivar usuario)
-export async function DELETE(request, { params }) {
+export async function DELETE(_request, { params }) {
     try {
-        const payload = await verifyAuth();
-        const resolvedParams = await params;
-        const { id } = resolvedParams;
-
-        // Solo el Admin o el Boss pueden "eliminar" (desactivar) a otros usuarios
-        const isAdminOrBoss = ['ADMIN', 'BARBER_BOSS'].includes(payload.role);
-        if (!isAdminOrBoss) {
-            return NextResponse.json({
-                error: "Acceso denegado. Solo un administrador puede desactivar usuarios."
-            }, { status: 403 });
+        const actor = await verifyAuth(['ADMIN', 'BARBER_BOSS']);
+        const { id } = await params;
+        if (actor.id === id) {
+            return NextResponse.json({ error: 'No puedes dar de baja tu propia cuenta.' }, { status: 400 });
         }
 
-        // Evitar que un Admin se desactive a sí mismo por error
-        if (payload.id === id) {
-            return NextResponse.json({ error: "No puedes desactivar tu propia cuenta." }, { status: 400 });
-        }
-
-        await deleteUserService(id);
-
-        return NextResponse.json({
-            message: "Usuario desactivado exitosamente. Ya no podrá iniciar sesión."
-        }, { status: 200 });
-
+        await deactivateBarberService(id, { archive: true });
+        return NextResponse.json({ message: 'Barbero retirado del equipo. Su historial se conservó.' });
     } catch (error) {
-        return handleApiError(error, "Error en DELETE user");
+        return handleApiError(error, 'Error al dar de baja barbero');
     }
 }
