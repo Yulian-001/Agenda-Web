@@ -19,7 +19,7 @@ export async function GET(request) {
                 archivedAt: null,
                 role: { in: ['ADMIN', 'BARBER_BOSS', 'BARBER_AFFILIATE', 'BARBER_INDEPENDENT'] },
                 services: {
-                    some: { serviceId: serviceId } // Filtro clave
+                    some: { serviceId, service: { isActive: true } }
                 }
             },
             select: {

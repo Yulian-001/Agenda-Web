@@ -21,15 +21,10 @@ export const createServiceService = async (data) => {
 };
 
 
-export const getServicesService = async () => {
-    // Traemos solo los servicios que no han sido eliminados lógicamente
-    const services = await prisma.services.findMany({
-        where: { isActive: true },
-        orderBy: { name: 'asc' } // Ordenados alfabéticamente
-    });
-
-    return services;
-};
+export const getServicesService = (includeInactive = false) => prisma.services.findMany({
+    where: includeInactive ? {} : { isActive: true },
+    orderBy: [{ name: 'asc' }, { id: 'asc' }]
+});
 
 export const updateServiceService = async (id, data) => {
     const service = await prisma.services.findUnique({ where: { id } });
@@ -45,16 +40,5 @@ export const updateServiceService = async (id, data) => {
     return await prisma.services.update({
         where: { id },
         data
-    });
-};
-
-export const deleteServiceService = async (id) => {
-    const service = await prisma.services.findUnique({ where: { id } });
-    if (!service) throw { statusCode: 404, message: 'Servicio no encontrado' };
-
-    // Soft delete: solo desactivamos el servicio
-    return await prisma.services.update({
-        where: { id },
-        data: { isActive: false }
     });
 };

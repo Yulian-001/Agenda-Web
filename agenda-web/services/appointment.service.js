@@ -42,10 +42,13 @@ export const createAppointmentService = async (data) => {
             });
             if (booked) throw { statusCode: 409, message: 'Este horario ya está ocupado.' };
 
-            const service = await tx.services.findFirst({
-                where: { id: serviceId, isActive: true, barbers: { some: { barberId } } },
-                select: { name: true, price: true }
-            });
+            // Comparte el bloqueo con la actualización del servicio durante la reserva.
+            const [service] = await tx.$queryRaw`
+                SELECT s."name", s."price" FROM "Services" s
+                JOIN "ServicesBarbers" sb ON sb."serviceId" = s."id"
+                WHERE s."id" = ${serviceId} AND s."isActive" = true AND sb."barberId" = ${barberId}
+                FOR SHARE OF s
+            `;
             if (!service) throw { statusCode: 400, message: 'El barbero no tiene asignado este servicio activo.' };
 
             if (!client) {
