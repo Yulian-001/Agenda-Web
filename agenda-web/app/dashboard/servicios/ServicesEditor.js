@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { CheckCircle2, Clock, Edit, Plus, Scissors, Search, X, XCircle } from 'lucide-react';
+import { CheckCircle2, Clock, Edit, Plus, Scissors, Search, Trash2, X, XCircle } from 'lucide-react';
 import { announceScheduleChange, watchSchedule } from '../../../utils/liveSchedule';
 
 const emptyForm = { name: '', description: '', duration: '', price: '' };
@@ -64,7 +64,7 @@ export default function ServicesEditor({ initialServices, canManageState, canEdi
                 ...(body && { headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) })
             });
             setServices(previous => [...previous.filter(service => service.id !== data.service.id), data.service]
-                .filter(service => canManageState || service.isActive)
+                .filter(service => !service.archivedAt && (canManageState || service.isActive))
                 .sort((a, b) => a.name.localeCompare(b.name, 'es-CO')));
             setForm(null);
             setResult({ message: data.message });
@@ -88,8 +88,12 @@ export default function ServicesEditor({ initialServices, canManageState, canEdi
 
     function toggleService(service) {
         if (service.isActive && !window.confirm(`¿Desactivar «${service.name}» para nuevas reservas?`)) return;
-        void mutate('/api/services/' + service.id, canManageState ? 'PATCH' : 'DELETE',
-            canManageState ? { isActive: !service.isActive } : undefined);
+        void mutate('/api/services/' + service.id, 'PATCH', { isActive: !service.isActive });
+    }
+
+    function removeService(service) {
+        if (!window.confirm(`¿Eliminar «${service.name}» del panel y de reservas? Sus citas y su historial se conservarán.`)) return;
+        void mutate('/api/services/' + service.id, 'DELETE');
     }
 
     function openForm(service) {
@@ -157,6 +161,10 @@ export default function ServicesEditor({ initialServices, canManageState, canEdi
                                     ? 'bg-amber-50 text-amber-900 hover:bg-amber-100' : 'bg-emerald-50 text-emerald-800 hover:bg-emerald-100')}>
                                 {service.isActive ? <><XCircle size={16} /> Desactivar</> : <><CheckCircle2 size={16} /> Reactivar</>}
                             </button>
+                            {canManageState && <button type="button" disabled={busy} onClick={() => removeService(service)}
+                                aria-label={`Eliminar ${service.name}`} className="flex items-center justify-center gap-1.5 rounded-lg bg-red-50 px-3 py-2 text-sm font-semibold text-red-800 hover:bg-red-100 disabled:opacity-50">
+                                <Trash2 size={16} /> Eliminar
+                            </button>}
                         </div>}
                     </article>
                 ))}

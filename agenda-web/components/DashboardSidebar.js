@@ -9,6 +9,7 @@ import {
     Scissors, Clock, BarChart3, LogOut
 } from 'lucide-react';
 import businessData from '../config/business';
+import { financeRoles } from '../config/finance';
 
 const menuItems = [
     { name: 'Calendario', icon: CalendarDays, path: '/dashboard' },
@@ -16,7 +17,7 @@ const menuItems = [
     { name: 'Barberos', icon: User, path: '/dashboard/barberos' },
     { name: 'Servicios', icon: Scissors, path: '/dashboard/servicios' },
     { name: 'Agenda', icon: Clock, path: '/dashboard/agenda', adminOnly: true },
-    { name: 'Contabilidad', icon: BarChart3, path: '/dashboard/contabilidad' },
+    { name: 'Contabilidad', icon: BarChart3, path: '/dashboard/contabilidad', allowedRoles: financeRoles },
 ];
 
 function SidebarContent({ userName, role, onNavigate }) {
@@ -39,7 +40,8 @@ function SidebarContent({ userName, role, onNavigate }) {
 
             {/* Menú */}
             <nav className="flex-1 py-4 px-3 flex flex-col gap-2 overflow-y-auto">
-                {menuItems.filter(item => !item.adminOnly || role === 'ADMIN').map((item) => (
+                {menuItems.filter(item => (!item.adminOnly || role === 'ADMIN') &&
+                    (!item.allowedRoles || item.allowedRoles.includes(role))).map((item) => (
                     <Link
                         key={item.name}
                         href={item.path}

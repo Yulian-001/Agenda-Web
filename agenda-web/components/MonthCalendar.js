@@ -1,7 +1,7 @@
 'use client';
 
 import { CalendarDays, ChevronLeft, ChevronRight } from 'lucide-react';
-import { civilDate, weekDays } from '../../../../config/schedule';
+import { civilDate, weekDays } from '../config/schedule';
 
 const monthFormat = new Intl.DateTimeFormat('es-CO', { month: 'long', year: 'numeric', timeZone: 'UTC' });
 const dayFormat = new Intl.DateTimeFormat('es-CO', { dateStyle: 'full', timeZone: 'UTC' });
@@ -11,6 +11,7 @@ const arrow = 'grid size-9 place-items-center rounded-lg border border-stone-200
 
 function dayStyle(status, selected, isToday) {
     if (selected) return 'border-stone-950 bg-stone-950 text-white';
+    if (status === 'calendar') return isToday ? 'border-stone-900 bg-stone-100 text-stone-950' : 'border-stone-200 bg-white text-stone-950 hover:bg-stone-100';
     if (status === 'available') {
         return isToday ? 'border-emerald-600 bg-emerald-50 text-emerald-900 hover:bg-emerald-100' : 'border-stone-200 bg-white text-stone-950 hover:border-emerald-600 hover:bg-emerald-50';
     }
@@ -18,7 +19,8 @@ function dayStyle(status, selected, isToday) {
     return 'cursor-not-allowed border-transparent bg-stone-100 text-stone-500';
 }
 
-export default function BookingCalendar({ month, today, date, days, error, onMonthChange, onDateChange }) {
+export default function MonthCalendar({ month, today, date, days, error, onMonthChange, onDateChange, mode = 'booking' }) {
+    const booking = mode === 'booking';
     const start = civilDate(month + '-01');
     const offset = (start.getUTCDay() + 6) % 7;
     const byDate = new Map((days ?? []).map(day => [day.date, day]));
@@ -34,15 +36,15 @@ export default function BookingCalendar({ month, today, date, days, error, onMon
     }
 
     return (
-        <section aria-labelledby="booking-calendar-title" aria-busy={!days && !error} className="space-y-3 rounded-2xl border border-stone-200 bg-stone-50/70 p-3 sm:p-5">
+        <section aria-labelledby="booking-calendar-title" aria-busy={booking && !days && !error} className="space-y-3 rounded-2xl border border-stone-200 bg-stone-50/70 p-3 sm:p-5">
             <div className="flex flex-wrap items-center justify-between gap-2">
                 <h2 id="booking-calendar-title" className="flex items-center gap-2 text-sm font-semibold text-stone-950">
-                    <CalendarDays size={17} aria-hidden="true" /> Fecha de la cita
+                    <CalendarDays size={17} aria-hidden="true" /> {booking ? 'Fecha de la cita' : 'Selecciona una fecha'}
                 </h2>
-                {days && <span className="text-xs font-medium text-stone-600">{count} {count === 1 ? 'día disponible' : 'días disponibles'}</span>}
+                {booking && days && <span className="text-xs font-medium text-stone-600">{count} {count === 1 ? 'día disponible' : 'días disponibles'}</span>}
             </div>
             <div className="flex items-center justify-between gap-2">
-                <button type="button" aria-label="Mes anterior" disabled={month <= today.slice(0, 7)} className={arrow} onClick={() => navigate(-1)}>
+                <button type="button" aria-label="Mes anterior" disabled={booking ? month <= today.slice(0, 7) : month === '0001-01'} className={arrow} onClick={() => navigate(-1)}>
                     <ChevronLeft size={18} aria-hidden="true" />
                 </button>
                 <p aria-live="polite" className="text-center text-base font-bold text-stone-950 first-letter:uppercase">{monthFormat.format(start)}</p>
@@ -60,12 +62,13 @@ export default function BookingCalendar({ month, today, date, days, error, onMon
                     const number = index + 1;
                     const key = month + '-' + String(number).padStart(2, '0');
                     const day = byDate.get(key);
-                    const status = day?.status ?? (key < today ? 'past' : null);
-                    const selected = key === date && status === 'available';
+                    const status = booking ? (day?.status ?? (key < today ? 'past' : null)) : 'calendar';
+                    const enabled = !booking || status === 'available';
+                    const selected = key === date && enabled;
                     const description = dayStatus[status] ?? 'Disponibilidad por consultar';
                     return (
-                        <button type="button" key={key} data-date={key} disabled={status !== 'available'} aria-pressed={selected}
-                            aria-label={dayFormat.format(civilDate(key)) + ', ' + description} title={description}
+                        <button type="button" key={key} data-date={key} disabled={!enabled} aria-pressed={selected}
+                            aria-label={dayFormat.format(civilDate(key)) + (booking ? ', ' + description : '')} title={booking ? description : undefined}
                             aria-current={key === today ? 'date' : undefined}
                             onClick={() => onDateChange(key)}
                             className={'relative grid h-10 place-items-center rounded-lg border pb-0.5 text-sm font-semibold tabular-nums focus-visible:outline-2 focus-visible:outline-offset-1 sm:h-11 ' + dayStyle(status, selected, key === today)}>
@@ -77,13 +80,13 @@ export default function BookingCalendar({ month, today, date, days, error, onMon
                 })}
             </div>
 
-            {!days && !error && <p role="status" className="text-xs text-stone-600">Consultando disponibilidad del mes…</p>}
-            {days && count === 0 && <p role="status" className="text-xs text-stone-700">No hay fechas disponibles en este mes.</p>}
-            <div className="flex flex-wrap gap-x-3 gap-y-1 border-t border-stone-200 pt-3 text-xs text-stone-700">
+            {booking && !days && !error && <p role="status" className="text-xs text-stone-600">Consultando disponibilidad del mes…</p>}
+            {booking && days && count === 0 && <p role="status" className="text-xs text-stone-700">No hay fechas disponibles en este mes.</p>}
+            {booking && <div className="flex flex-wrap gap-x-3 gap-y-1 border-t border-stone-200 pt-3 text-xs text-stone-700">
                 <span><span aria-hidden="true" className="mr-1 inline-block size-2 rounded-full bg-emerald-700" />Disponible</span>
                 <span><span aria-hidden="true" className="mr-1 inline-block h-0.5 w-2.5 align-middle bg-rose-700" />Sin cupos</span>
                 <span><span aria-hidden="true" className="mr-1 inline-block size-2 rounded-sm border border-stone-300 bg-stone-100" />Sin atención o fecha pasada</span>
-            </div>
+            </div>}
         </section>
     );
 }

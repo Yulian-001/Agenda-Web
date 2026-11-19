@@ -22,12 +22,36 @@ export const createServiceService = async (data) => {
 
 
 export const getServicesService = (includeInactive = false) => prisma.services.findMany({
-    where: includeInactive ? {} : { isActive: true },
+    where: { archivedAt: null, ...(includeInactive ? {} : { isActive: true }) },
     orderBy: [{ name: 'asc' }, { id: 'asc' }]
 });
 
+export async function getPublicServiceBarbers(id) {
+    const service = await prisma.services.findUnique({
+        where: { id, isActive: true, archivedAt: null },
+        select: {
+            name: true,
+            barbers: {
+                where: { barber: { state: true, archivedAt: null } },
+                orderBy: { barber: { name: 'asc' } },
+                select: { barber: { select: { id: true, name: true, photo: true, description: true } } }
+            }
+        }
+    });
+    return { serviceName: service?.name ?? null, barbers: service?.barbers.map(item => item.barber) ?? [] };
+}
+
+async function updateCurrentService(id, data) {
+    try {
+        return await prisma.services.update({ where: { id, archivedAt: null }, data });
+    } catch (error) {
+        if (error.code === 'P2025') throw { statusCode: 404, message: 'Servicio no encontrado' };
+        throw error;
+    }
+}
+
 export const updateServiceService = async (id, data) => {
-    const service = await prisma.services.findUnique({ where: { id } });
+    const service = await prisma.services.findUnique({ where: { id, archivedAt: null } });
     if (!service) throw { statusCode: 404, message: 'Servicio no encontrado' };
 
     if (data.name && data.name !== service.name) {
@@ -37,8 +61,7 @@ export const updateServiceService = async (id, data) => {
         if (existing) throw { statusCode: 409, message: 'Ya existe otro servicio con ese nombre' };
     }
 
-    return await prisma.services.update({
-        where: { id },
-        data
-    });
+    return updateCurrentService(id, data);
 };
+
+export const archiveService = id => updateCurrentService(id, { isActive: false, archivedAt: new Date() });

@@ -1,6 +1,7 @@
 // utils/validations.js
 import { z } from 'zod';
 import { Role, DayOfWeek } from '@prisma/client';
+import { securePasswordPattern, securePasswordMessage } from '../config/auth';
 import { slotKey } from '../config/schedule';
 import { teamBarberRoles } from '../config/barberRoles';
 import { jpegPhotoPrefix, maxBarberPhotoBytes } from './barberPhoto';
@@ -12,10 +13,7 @@ export const registerSchema = z.object({
         .trim()
         .length(10, "El teléfono debe tener 10 dígitos")
         .startsWith('3', "El teléfono debe iniciar con 3"),
-    password: z.string().regex(
-        /^(?=.*[a-z])(?=.*[A-Z])(?=.*[!#$%&/(){}*+<>]).{8,}$/,
-        "Contraseña débil: debe incluir mayúsculas, minúsculas y un carácter especial (!#$%&/(){}*+<>)"
-    ),
+    password: z.string().regex(securePasswordPattern, securePasswordMessage),
     role: z.nativeEnum(Role, { errorMap: () => ({ message: "Rol inválido" }) }),
     photo: z.string().url("Debe ser una URL válida").regex(/\.(jpg|jpeg|png)$/i, "La foto debe ser JPG o PNG"),
     description: z.string().min(10, "La descripción es muy corta"),
@@ -108,15 +106,15 @@ export const updateOwnProfileSchema = updateUserSchema.pick({
     haveWhatsApp: true
 }).strict();
 
-export const forgotPasswordSchema = z.object({
-    phone: z.string().length(10, "El teléfono debe tener 10 dígitos")
+const recoveryPhone = z.string().trim().regex(/^\d{10}$/, 'Ingresa un número de teléfono de diez dígitos.');
+
+export const forgotPasswordSchema = z.object({ phone: recoveryPhone });
+
+export const verifyRecoverySchema = z.object({
+    phone: recoveryPhone,
+    otpCode: z.string().regex(/^\d{6}$/, 'Ingresa los seis dígitos del código.')
 });
 
-export const resetPasswordSchema = z.object({
-    phone: z.string().length(10),
-    otpCode: z.string().length(6, "El código debe tener 6 dígitos"),
-    newPassword: z.string().regex(
-        /^(?=.*[a-z])(?=.*[A-Z])(?=.*[!#$%&/(){}*+<>]).{8,}$/,
-        "Contraseña débil: debe incluir mayúsculas, minúsculas y un carácter especial"
-    )
+export const resetPasswordSchema = verifyRecoverySchema.extend({
+    newPassword: z.string().regex(securePasswordPattern, securePasswordMessage)
 });

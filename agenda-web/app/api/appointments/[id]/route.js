@@ -9,8 +9,7 @@ export async function PUT(request, { params }) {
         const resolvedParams = await params;
         const { id } = resolvedParams;
 
-        const body = await request.json();
-        const { state } = body;
+        const { state } = await request.json().catch(() => ({})) ?? {};
 
         // Validar que el estado sea uno de los permitidos
         if (!['CONFIRMED', 'COMPLETED', 'CANCELLED'].includes(state)) {
@@ -20,7 +19,7 @@ export async function PUT(request, { params }) {
         const updated = await updateAppointmentStatusService(id, state, payload);
 
         return NextResponse.json({
-            message: `Cita actualizada a estado: ${state}`,
+            message: state === 'CANCELLED' ? 'Cita cancelada' : 'Estado de la cita actualizado',
             appointment: updated
         }, { status: 200 });
 

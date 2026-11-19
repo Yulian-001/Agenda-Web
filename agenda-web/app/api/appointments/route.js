@@ -1,7 +1,7 @@
 // app/api/appointments/route.js
 import { NextResponse } from 'next/server';
 import { verifyAuth } from '../../../utils/auth';
-import { createAppointmentSchema } from '../../../utils/validations';
+import { createAppointmentSchema, scheduleDateSchema } from '../../../utils/validations';
 import { createAppointmentService, getAppointmentsService } from '../../../services/appointment.service';
 
 // GET: Listar Citas (Requiere Login)
@@ -13,6 +13,9 @@ export async function GET(request) {
         const { searchParams } = new URL(request.url);
         const date = searchParams.get('date');
         const view = searchParams.get('view') || 'personal';
+        if (date && !scheduleDateSchema.safeParse(date).success) {
+            return NextResponse.json({ error: 'Selecciona una fecha válida.' }, { status: 400 });
+        }
 
         const appointments = await getAppointmentsService(payload, { date, view });
 
@@ -20,7 +23,7 @@ export async function GET(request) {
             message: "Citas obtenidas",
             count: appointments.length,
             appointments
-        }, { status: 200 });
+        }, { headers: { 'Cache-Control': 'no-store' } });
 
     } catch (error) {
         if (error.statusCode) return NextResponse.json({ error: error.message }, { status: error.statusCode });
@@ -47,7 +50,7 @@ export async function POST(request) {
 
     } catch (error) {
         console.error("Error al agendar cita:", error);
-        if (error.statusCode) return NextResponse.json({ error: error.message }, { status: error.statusCode });
+        if (error.statusCode) return NextResponse.json({ error: error.message, code: error.code }, { status: error.statusCode });
         return NextResponse.json({ error: "Error interno" }, { status: 500 });
     }
-} 
+}

@@ -52,10 +52,13 @@ export async function GET(request) {
         else end.setUTCDate(end.getUTCDate() + 1);
         const [today, now] = scheduleNow();
 
-        const where = serviceId ? { services: { some: { serviceId, service: { isActive: true } } } } : {};
+        const where = serviceId ? { services: { some: { serviceId, service: { isActive: true, archivedAt: null } } } } : {};
         const schedule = await loadScheduleRange(prisma, barberId, startDate, dateKey(end), where);
         if (serviceId && !schedule) {
-            return NextResponse.json({ error: 'Este barbero ya no ofrece el servicio seleccionado.' }, { status: 404 });
+            return NextResponse.json({
+                error: 'El barbero o el servicio seleccionado ya no está disponible. Vuelve a elegir para continuar.',
+                code: 'SELECTION_UNAVAILABLE'
+            }, { status: 404, headers: { 'Cache-Control': 'no-store' } });
         }
 
         const appointments = schedule ? await prisma.appointment.findMany({
