@@ -1,5 +1,8 @@
 export const recoveryDurationMs = 5 * 60 * 1000;
 export const recoveryResendMs = 60 * 1000;
+export const recoveryRequestLimit = 3;
+export const recoveryIpWindowMs = 15 * 60 * 1000;
+export const recoveryPhoneWindowMs = 60 * 60 * 1000;
 export const accountLockMs = 15 * 60 * 1000;
 export const maxLoginFailures = 5;
 export const maxCodeFailures = 5;
