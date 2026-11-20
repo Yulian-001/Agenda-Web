@@ -1,3 +1,5 @@
+[Contexto funcional y técnico de Agenda Web](CONTEXTO.md)
+
 This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
 
 ## Getting Started
