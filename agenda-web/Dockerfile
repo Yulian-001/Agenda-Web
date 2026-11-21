@@ -11,7 +11,16 @@ COPY --from=deps /app/node_modules ./node_modules
 COPY . .
 ARG DATABASE_URL
 ENV DATABASE_URL=$DATABASE_URL
-RUN npm install -g pnpm && pnpm run build
+RUN npm install -g pnpm && pnpm exec prisma generate && pnpm run build
+
+FROM node:20-alpine AS mail-worker
+WORKDIR /app
+ENV NODE_ENV=production
+COPY --from=builder /app/node_modules ./node_modules
+COPY scripts/mail-worker.mjs scripts/appointment-email.mjs ./scripts/
+COPY config/business.json ./config/business.json
+COPY utils/mail.mjs ./utils/mail.mjs
+CMD ["node", "scripts/mail-worker.mjs"]
 
 # Etapa 3: Ejecución
 FROM node:20-alpine AS runner

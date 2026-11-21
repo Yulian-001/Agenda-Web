@@ -1,7 +1,8 @@
+import { publiclyBookable } from '../config/barberRoles';
 // services/service.service.js
 import { prisma } from '../utils/prisma';
 
-export const createServiceService = async (data) => {
+export const createServiceService = async (data, barberId) => {
     const { name, description, duration, price } = data;
 
     // Validación de Negocio: Evitar duplicados
@@ -14,7 +15,7 @@ export const createServiceService = async (data) => {
     }
 
     const newService = await prisma.services.create({
-        data: { name, description, duration, price }
+        data: { name, description, duration, price, ...(barberId && { barbers: { create: { barberId } } }) }
     });
 
     return newService;
@@ -32,7 +33,7 @@ export async function getPublicServiceBarbers(id) {
         select: {
             name: true,
             barbers: {
-                where: { barber: { state: true, archivedAt: null } },
+                where: { barber: publiclyBookable },
                 orderBy: { barber: { name: 'asc' } },
                 select: { barber: { select: { id: true, name: true, photo: true, description: true } } }
             }

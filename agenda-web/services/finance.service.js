@@ -91,8 +91,12 @@ function weekOf(date) {
 export const getFinancesService = async (user, filters) => {
     const [today] = scheduleNow();
     const period = resolvePeriod(filters, today);
-    const team = financeRoles.includes(user.role);
-    const scope = team ? { barber: { role: { not: 'BARBER_INDEPENDENT' } } } : { barberId: user.id };
+    const team = financeRoles.includes(user.role) && (user.role === 'ADMIN' || filters.view !== 'personal');
+    const teamBarbers = {
+        role: { in: ['BARBER_BOSS', 'BARBER_AFFILIATE'] },
+        ...(user.role === 'BARBER_BOSS' && { id: { not: user.id } })
+    };
+    const scope = team ? { barber: teamBarbers } : { barberId: user.id };
     const barberSelect = { id: true, name: true, role: true, commissionRate: true, settlementDirection: true, archivedAt: true, state: true };
     const [appointments, profiles, lifetime, catalog, clientSanctions] = await Promise.all([
         prisma.appointment.findMany({
@@ -110,7 +114,9 @@ export const getFinancesService = async (user, filters) => {
             orderBy: [{ date: 'asc' }, { timeSlot: 'asc' }]
         }),
         prisma.user.findMany({
-            where: team ? { role: { not: 'BARBER_INDEPENDENT' }, archivedAt: null } : { id: user.id },
+            where: team ? {
+                ...teamBarbers, archivedAt: null
+            } : { id: user.id },
             select: barberSelect
         }),
         prisma.appointment.groupBy({ by: ['barberId'], where: { ...scope, state: 'COMPLETED' }, _count: { _all: true } }),
@@ -190,6 +196,26 @@ export const getFinancesService = async (user, filters) => {
         uniqueClients: row.clients.size, monthlyCounts: Object.fromEntries(row.months)
     })).sort(compareActivity);
 
+    if (!team) {
+        const own = teamReport[0];
+        return {
+            period,
+            summary: {
+                scheduled: summary.scheduled, completed: summary.completed, cancelled: summary.cancelled,
+                totalRevenue: own?.totalSales ?? 0, barberEarnings: own?.barberEarnings ?? 0, estimated: own?.estimated ?? 0
+            },
+            personal: {
+                commissionRate: user.role === 'BARBER_INDEPENDENT' ? 1 : own?.commissionRate ?? 0,
+                appliedRates: own?.appliedRates ?? [],
+                appointments: appointments.map(row => ({
+                    id: row.id, date: keyOf(row.date), timeSlot: row.timeSlot, state: row.state,
+                    service: row.service.name
+                }))
+            },
+            chart: [...chart.values()].map(row => ({ key: row.key, revenue: currency(row.cents), completed: row.completed }))
+        };
+    }
+
     const serviceReport = [...services.values()].map(toActivity).sort(compareActivity);
     const customerReport = [...clients.values()].map(row => {
         const days = [...row.days].sort();
@@ -212,34 +238,35 @@ export const getFinancesService = async (user, filters) => {
                 name: row.name, count: row.completed, percentage: percent(row.completed, summary.completed) + '%'
             }))
         },
-        teamReport: team ? teamReport : teamReport[0] ?? null,
+        teamReport,
         chart: [...chart.values()].map(row => ({ key: row.key, revenue: currency(row.cents), completed: row.completed })),
-        ...(team ? {
-            services: serviceReport,
-            clientSanctions: clientSanctions.map(({ isBanned, blockedUntil, ...client }) => ({
-                ...client, blockedUntil,
-                status: isBanned ? 'BANNED' : blockedUntil > new Date() ? 'BLOCKED' : client.strikes ? 'STRIKES' : 'CLEAR'
-            })),
-            lowDemand: serviceReport.filter(row => catalog.some(service => service.id === row.id)).sort((a, b) => a.completed - b.completed || a.revenue - b.revenue),
-            salesByClient: customerReport.filter(row => row.completed > 0).sort((a, b) => b.revenue - a.revenue || b.completed - a.completed),
-            loyalty: customerReport.filter(row => row.visitDays >= 2).sort((a, b) =>
-                b.activeWeeks - a.activeWeeks || b.visitDays - a.visitDays || b.completed - a.completed),
-            customerCancellations: customerReport.filter(row => row.cancelled > 0).sort((a, b) =>
-                b.cancelled - a.cancelled || b.cancellationRate - a.cancellationRate),
-            authors: [...authors.values()].map(item => ({ ...item, rate: percent(item.count, summary.scheduled) })).sort((a, b) => b.count - a.count),
-            cancellationByRole: [...roleCounts].map(([role, count]) => ({ role, count, rate: percent(count, summary.scheduled) })).sort((a, b) => b.count - a.count),
-            patterns: detectCancellationPatterns(appointments, today)
-        } : {})
+        services: serviceReport,
+        clientSanctions: clientSanctions.map(({ isBanned, blockedUntil, ...client }) => ({
+            ...client, blockedUntil,
+            status: isBanned ? 'BANNED' : blockedUntil > new Date() ? 'BLOCKED' : client.strikes ? 'STRIKES' : 'CLEAR'
+        })),
+        lowDemand: serviceReport.filter(row => catalog.some(service => service.id === row.id)).sort((a, b) => a.completed - b.completed || a.revenue - b.revenue),
+        salesByClient: customerReport.filter(row => row.completed > 0).sort((a, b) => b.revenue - a.revenue || b.completed - a.completed),
+        loyalty: customerReport.filter(row => row.visitDays >= 2).sort((a, b) =>
+            b.activeWeeks - a.activeWeeks || b.visitDays - a.visitDays || b.completed - a.completed),
+        customerCancellations: customerReport.filter(row => row.cancelled > 0).sort((a, b) =>
+            b.cancelled - a.cancelled || b.cancellationRate - a.cancellationRate),
+        authors: [...authors.values()].map(item => ({ ...item, rate: percent(item.count, summary.scheduled) })).sort((a, b) => b.count - a.count),
+        cancellationByRole: [...roleCounts].map(([role, count]) => ({ role, count, rate: percent(count, summary.scheduled) })).sort((a, b) => b.count - a.count),
+        patterns: detectCancellationPatterns(appointments, today)
     };
 };
 
-export async function updateSettlementSettings(id, data) {
+export async function updateSettlementSettings(id, data, actor) {
     if (!Object.hasOwn(settlementDirections, data.settlementDirection)) {
         throw { statusCode: 400, message: 'Selecciona una modalidad de liquidación válida.' };
     }
     try {
         return await prisma.user.update({
-            where: { id, archivedAt: null, role: { not: 'BARBER_INDEPENDENT' } },
+            where: {
+                id, archivedAt: null, role: { in: ['BARBER_BOSS', 'BARBER_AFFILIATE'] },
+                ...(actor.role === 'BARBER_BOSS' && { NOT: { id: actor.id } })
+            },
             data,
             select: { id: true, name: true, commissionRate: true, settlementDirection: true }
         });

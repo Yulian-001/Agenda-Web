@@ -4,7 +4,7 @@ import { useEffect, useState } from 'react';
 import { CheckCircle, Edit, Loader2, Plus, Trash2, User, XCircle } from 'lucide-react';
 import { announceScheduleChange } from '../../../utils/liveSchedule';
 import BarberPhotoField from '../../../components/BarberPhotoField';
-import { teamBarberRoles } from '../../../config/barberRoles';
+import { adminProtection, teamBarberRoles } from '../../../config/barberRoles';
 
 const fieldClass = 'w-full rounded-xl border border-gray-200 bg-gray-50 p-3';
 const newBarber = {
@@ -30,13 +30,16 @@ async function loadBarbers(signal) {
     return { ...team, catalog: catalog.services };
 }
 
-function BarberForm({ barber, catalog, viewerId, pending, error, onCancel, onSave }) {
+function BarberForm({ barber, catalog, viewerId, viewerRole, pending, error, onCancel, onSave }) {
     const editing = Boolean(barber);
+    const canChangeRole = !editing || (barber.id !== viewerId && !barber.isOwner &&
+        !(viewerRole === 'BARBER_BOSS' && barber.role === 'ADMIN'));
     const [form, setForm] = useState(() => barber ? {
         name: barber.name, description: barber.description, photo: barber.photo, role: barber.role,
         commissionRate: barber.commissionRate, haveWhatsApp: barber.haveWhatsApp,
         services: barber.services.map(({ service }) => service.id)
     } : newBarber);
+    const canSetCommission = form.role !== 'ADMIN' && !(editing && viewerRole === 'BARBER_BOSS' && barber.id === viewerId);
     const [readyPhoto, setReadyPhoto] = useState(null);
     const [processingPhoto, setProcessingPhoto] = useState(false);
     const [photoError, setPhotoError] = useState('');
@@ -56,11 +59,13 @@ function BarberForm({ barber, catalog, viewerId, pending, error, onCancel, onSav
     function save(event) {
         event.preventDefault();
         if (pending || processingPhoto) return;
-        if (!form.photo || readyPhoto !== form.photo) {
+        if (form.role !== 'ADMIN' && (!form.photo || readyPhoto !== form.photo)) {
             setPhotoError(form.photo ? 'Usa una foto que se pueda ver en la vista previa.' : 'Agrega la foto del barbero para continuar.');
             return;
         }
-        onSave(form, barber?.id);
+        const payload = { ...form };
+        if (!canSetCommission) delete payload.commissionRate;
+        onSave(payload, barber?.id);
     }
 
     return (
@@ -97,14 +102,16 @@ function BarberForm({ barber, catalog, viewerId, pending, error, onCancel, onSav
                         <div className="grid grid-cols-2 gap-4">
                             <label className="block text-sm font-semibold text-gray-600">
                                 Rol
-                                <select className={fieldClass} disabled={editing && barber.id === viewerId} value={form.role} onChange={event => setField('role', event.target.value)}>
-                                    {Object.entries(teamBarberRoles).map(([value, label]) => <option key={value} value={value}>{label}</option>)}
+                                <select className={fieldClass} disabled={!canChangeRole} value={form.role} onChange={event => setField('role', event.target.value)}>
+                                    {Object.entries(teamBarberRoles)
+                                        .filter(([value]) => value !== 'ADMIN' || viewerRole === 'ADMIN' || barber?.role === 'ADMIN')
+                                        .map(([value, label]) => <option key={value} value={value}>{label}</option>)}
                                 </select>
                             </label>
-                            <label className="block text-sm font-semibold text-gray-600">
+                            {canSetCommission && <label className="block text-sm font-semibold text-gray-600">
                                 Comisión ({Math.round(form.commissionRate * 100)} %)
                                 <input className="mt-3 w-full accent-black" type="range" min={0} max={1} step={0.01} value={form.commissionRate} onChange={event => setField('commissionRate', event.target.valueAsNumber)} />
-                            </label>
+                            </label>}
                         </div>
                         <label className="flex items-center gap-2 text-sm text-gray-700">
                             <input type="checkbox" checked={form.haveWhatsApp} onChange={event => setField('haveWhatsApp', event.target.checked)} />
@@ -186,7 +193,22 @@ export default function BarberosPage() {
         }
     }
 
+    function warnProtected(barber) {
+        if (team.viewerRole === 'BARBER_BOSS' && barber.role === 'ADMIN') {
+            setNotice('');
+            setError(adminProtection);
+            return true;
+        }
+        if (barber.isOwner) {
+            setNotice('');
+            setError('No puedes retirar ni desactivar la cuenta propietaria.');
+            return true;
+        }
+        return false;
+    }
+
     function toggleState(barber) {
+        if (warnProtected(barber)) return;
         const message = barber.state
             ? `¿Quieres desactivar a ${barber.name}? Dejará de aparecer en las reservas y se conservará su historial.`
             : `¿Quieres reactivar a ${barber.name}?`;
@@ -196,6 +218,7 @@ export default function BarberosPage() {
     }
 
     function archiveBarber(barber) {
+        if (warnProtected(barber)) return;
         const confirmed = window.confirm(
             `¿Quieres eliminar a ${barber.name} del equipo? Su perfil desaparecerá del panel y de reservas. Sus citas e historial se conservarán.`
         );
@@ -243,7 +266,7 @@ export default function BarberosPage() {
                             </div>
                         </div>
                         <dl className="space-y-3 bg-gray-50/50 p-6 text-sm">
-                            <div className="flex justify-between gap-4"><dt className="text-gray-600">Comisión</dt><dd className="font-bold text-green-700">{Math.round(barber.commissionRate * 100)} %</dd></div>
+                            {barber.role !== 'ADMIN' && <div className="flex justify-between gap-4"><dt className="text-gray-600">Comisión</dt><dd className="font-bold text-green-700">{Math.round(barber.commissionRate * 100)} %</dd></div>}
                             <div className="flex justify-between gap-4"><dt className="text-gray-600">Servicios asignados</dt><dd className="text-right font-semibold text-gray-800">{barber.services.map(({ service }) => service.name).join(', ') || 'Sin servicios'}</dd></div>
                         </dl>
                         <div className="flex flex-wrap gap-2 border-t border-gray-100 p-4">
@@ -264,7 +287,7 @@ export default function BarberosPage() {
             </div>
 
             {dialog && (
-                <BarberForm barber={dialog.barber} catalog={team.catalog} viewerId={team.viewerId} pending={pending} error={error}
+                <BarberForm barber={dialog.barber} catalog={team.catalog} viewerId={team.viewerId} viewerRole={team.viewerRole} pending={pending} error={error}
                     onCancel={() => { setDialog(null); setError(''); }}
                     onSave={(body, id) => mutate(id ? `/api/users/${id}` : '/api/users', id ? 'PUT' : 'POST', body)} />
             )}

@@ -1,5 +1,6 @@
 import { redirect } from 'next/navigation';
 import DashboardSidebar from '../../components/DashboardSidebar';
+import { getDashboardProfile } from '../../services/user.service';
 import { verifyAuth } from '../../utils/auth';
 
 export default async function DashboardLayout({ children }) {
@@ -12,7 +13,7 @@ export default async function DashboardLayout({ children }) {
     }
 
     return (
-        <DashboardSidebar userName={user.name} role={user.role}>
+        <DashboardSidebar profile={await getDashboardProfile(user)}>
             {children}
         </DashboardSidebar>
     );

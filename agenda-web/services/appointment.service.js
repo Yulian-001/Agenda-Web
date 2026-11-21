@@ -1,6 +1,8 @@
+import { teamManagers } from '../config/barberRoles';
 // services/appointment.service.js
 import { prisma } from '../utils/prisma';
-import { logger } from '../utils/logger';
+import { acceptsAppointmentLink, appointmentStart } from '../utils/mail.mjs';
+import { queueBookingEmails, queueCancellationEmails } from './appointment-mail';
 import { ensureBarberInOperation } from './user.service';
 
 import { civilDate, scheduleNow, slotKey } from '../config/schedule';
@@ -15,7 +17,7 @@ const bogotaDateTime = new Intl.DateTimeFormat('es-CO', {
 });
 
 export const createAppointmentService = async (data) => {
-    const { clientName, clientPhone, barberId, serviceId, date } = data;
+    const { clientEmail, clientName, clientPhone, barberId, serviceId, date } = data;
     const timeSlot = slotKey(data.timeSlot);
     const bookingDate = civilDate(date);
     const [today, now] = scheduleNow();
@@ -27,7 +29,7 @@ export const createAppointmentService = async (data) => {
         const appointment = await prisma.$transaction(async tx => {
             // La reserva mantiene activo al profesional hasta que termine su escritura.
             const [barber] = await tx.$queryRaw`
-                SELECT "id" FROM "User" WHERE "id" = ${barberId} AND "state" = true AND "archivedAt" IS NULL FOR SHARE
+                SELECT "id" FROM "User" WHERE "id" = ${barberId} AND "state" = true AND "archivedAt" IS NULL AND ("role" IN ('BARBER_BOSS', 'BARBER_AFFILIATE') OR ("role" = 'BARBER_INDEPENDENT' AND "isOwner")) FOR SHARE
             `;
             if (!barber) throw { statusCode: 400, code: 'SELECTION_UNAVAILABLE', message: 'El barbero ya no está disponible para reservar. Elige otro barbero.' };
 
@@ -48,7 +50,7 @@ export const createAppointmentService = async (data) => {
 
             const timeVariants = timeSlot.startsWith('0') ? [timeSlot, timeSlot.slice(1)] : [timeSlot];
             const booked = await tx.appointment.findFirst({
-                where: { barberId, date: bookingDate, timeSlot: { in: timeVariants } },
+                where: { barberId, date: bookingDate, timeSlot: { in: timeVariants }, state: { not: 'CANCELLED' } },
                 select: { id: true }
             });
             if (booked) throw { statusCode: 409, message: 'Este horario ya está ocupado.' };
@@ -75,16 +77,17 @@ export const createAppointmentService = async (data) => {
                     date: bookingDate,
                     timeSlot,
                     priceAtBooking: service.price,
+                    clientEmail,
                     clientId: client.id,
                     barberId,
                     serviceId,
                     historyAppointment: { create: { state: 'PENDING', barberId, serviceId } }
                 }
             });
-            return { data: newAppointment, serviceName: service.name };
+            await queueBookingEmails(tx, newAppointment);
+            return newAppointment;
         });
-        logger.dev(`📱 WhatsApp a ${clientPhone}: Hola ${clientName}, tu cita para ${appointment.serviceName} ha sido agendada.`);
-        return appointment.data;
+        return appointment;
     } catch (error) {
         if (error.code === 'P2002') {
             throw { statusCode: 409, message: 'Este horario acaba de ser ocupado por otro cliente. Por favor elige otro.' };
@@ -104,8 +107,9 @@ export const getAppointmentsService = async (user, { date, view }) => {
         where.date = { gte: start, lt: new Date(start.getTime() + 24 * 60 * 60 * 1000) };
     }
 
-    const canViewTeam = ['ADMIN', 'BARBER_BOSS'].includes(user.role);
-    if (view === 'personal' || !canViewTeam) where.barberId = user.id;
+    const canViewTeam = teamManagers.includes(user.role);
+    if (view !== 'team' || !canViewTeam) where.barberId = user.id;
+    else where.barber = { ...where.barber, role: { not: 'BARBER_INDEPENDENT' } };
 
     const appointments = await prisma.appointment.findMany({
         where,
@@ -124,7 +128,7 @@ export const getAppointmentsService = async (user, { date, view }) => {
     });
 
     return appointments.map(app => ({
-        id: app.id, date: app.date, timeSlot: slotKey(app.timeSlot), state: app.state,
+        id: app.id, date: app.date, timeSlot: slotKey(app.timeSlot), state: app.state, clientConfirmedAt: app.clientConfirmedAt,
         priceAtBooking: app.priceAtBooking, clientName: app.client.name, clientPhone: app.client.phone,
         barberId: app.barberId, barberName: app.barber.name, barberPhoto: app.barber.photo,
         serviceId: app.serviceId, serviceName: app.service.name,
@@ -134,11 +138,11 @@ export const getAppointmentsService = async (user, { date, view }) => {
 
 async function changeAppointmentState(tx, appointment, state, actor, financeSnapshot) {
     const { count } = await tx.appointment.updateMany({
-        where: { id: appointment.id, state: { in: openStates } },
+        where: { id: appointment.id, state: { in: state === 'CONFIRMED' ? ['PENDING'] : openStates } },
         data: { state, ...financeSnapshot }
     });
     if (!count) {
-        throw { statusCode: 409, message: 'La cita ya fue cancelada o completada. Revisa su estado.' };
+        throw { statusCode: 409, message: 'La cita ya cambió de estado. Revisa su estado actual.' };
     }
 
     return tx.historyAppointment.create({
@@ -154,13 +158,18 @@ export const updateAppointmentStatusService = (appointmentId, newState, user) =>
     const appointment = await tx.appointment.findUnique({ where: { id: appointmentId } });
     if (!appointment) throw { statusCode: 404, message: 'Cita no encontrada' };
 
-    if (appointment.barberId !== user.id && !['ADMIN', 'BARBER_BOSS'].includes(user.role)) {
+    if (appointment.barberId !== user.id && !teamManagers.includes(user.role)) {
         throw { statusCode: 403, message: 'No tienes permiso para modificar esta cita.' };
     }
 
     await ensureBarberInOperation(tx, appointment.barberId);
     let financeSnapshot;
     if (newState === 'COMPLETED') {
+        const [today, now] = scheduleNow();
+        const day = appointment.date.toISOString().slice(0, 10);
+        if (day > today || (day === today && slotKey(appointment.timeSlot) > now)) {
+            throw { statusCode: 409, message: 'Solo puedes completar una cita cuando llegue su hora de inicio.' };
+        }
         const barber = await tx.user.findUnique({
             where: { id: appointment.barberId },
             select: { role: true, commissionRate: true, settlementDirection: true }
@@ -173,28 +182,30 @@ export const updateAppointmentStatusService = (appointmentId, newState, user) =>
     const history = await changeAppointmentState(tx, appointment, newState, {
         actorUserId: user.id, actorName: user.name, actorRole: user.role
     }, financeSnapshot);
+    if (newState === 'CANCELLED') await queueCancellationEmails(tx, appointment, false);
     const updated = await tx.appointment.findUnique({ where: { id: appointment.id } });
     return { ...updated, cancellation: newState === 'CANCELLED' ? history : null };
 });
 
 // La cancelación por el cliente conserva las reglas de faltas y registra su origen.
-export const cancelAppointmentService = (appointmentId, clientPhone) => prisma.$transaction(async tx => {
+export const cancelAppointmentService = (appointmentId, clientPhone, token) => prisma.$transaction(async tx => {
     const appointment = await tx.appointment.findUnique({ where: { id: appointmentId } });
     if (!appointment) throw { statusCode: 404, message: 'Cita no encontrada' };
+    if (token && !acceptsAppointmentLink(appointment, token)) throw invalidAppointmentLink;
     await ensureBarberInOperation(tx, appointment.barberId);
 
     const [client] = await tx.$queryRaw`
         SELECT "name", "phone", "strikes", "blockCount", "blockedUntil", "isBanned"
         FROM "Clients" WHERE "id" = ${appointment.clientId} FOR UPDATE
     `;
-    if (client.phone !== clientPhone) throw { statusCode: 403, message: 'Número de teléfono no coincide con la cita.' };
+    if (!token && client.phone !== clientPhone) throw { statusCode: 403, message: 'Número de teléfono no coincide con la cita.' };
 
     await changeAppointmentState(tx, appointment, 'CANCELLED', { actorName: client.name, actorRole: 'CLIENT' });
-    const date = appointment.date.toISOString().slice(0, 10);
-    const startsAt = new Date(date + 'T' + slotKey(appointment.timeSlot) + ':00-05:00');
+    const startsAt = appointmentStart(appointment);
     const now = new Date();
     const remaining = startsAt - now;
     const isLate = remaining > 0 && remaining < strikeWindowMs;
+    await queueCancellationEmails(tx, appointment, isLate);
     if (!isLate) return { message: 'Cita cancelada.', strikeApplied: false };
 
     const effective = {
@@ -220,3 +231,24 @@ export const cancelAppointmentService = (appointmentId, clientPhone) => prisma.$
     }
     return { message, strikeApplied: true, sanction };
 });
+
+const invalidAppointmentLink = { statusCode: 400, message: 'El enlace de la cita ya no es válido.' };
+
+export function respondToAppointment(id, token, action) {
+    if (action === 'cancel') return cancelAppointmentService(id, null, token);
+    return prisma.$transaction(async tx => {
+        await tx.$queryRaw`SELECT "id" FROM "Appointment" WHERE "id" = ${id} FOR UPDATE`;
+        const appointment = await tx.appointment.findUnique({
+            where: { id }, include: { client: { select: { name: true } } }
+        });
+        if (!appointment || !acceptsAppointmentLink(appointment, token)) throw invalidAppointmentLink;
+        if (!openStates.includes(appointment.state)) throw { statusCode: 409, message: 'La cita ya fue cerrada.' };
+        if (!appointment.clientConfirmedAt) {
+            if (appointment.state === 'PENDING') {
+                await changeAppointmentState(tx, appointment, 'CONFIRMED', { actorName: appointment.client.name, actorRole: 'CLIENT' });
+            }
+            await tx.appointment.update({ where: { id }, data: { clientConfirmedAt: new Date() } });
+        }
+        return { message: 'Tu asistencia quedó confirmada.' };
+    });
+}

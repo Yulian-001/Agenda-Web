@@ -1,5 +1,5 @@
 import { prisma } from '../utils/prisma';
-import { teamBarberRoles } from '../config/barberRoles';
+import { adminGrantProtection, adminProtection, teamBarberRoles } from '../config/barberRoles';
 import { barberPhotoSchema } from '../utils/validations';
 
 const barberSelect = {
@@ -12,14 +12,18 @@ const barberSelect = {
     haveWhatsApp: true,
     commissionRate: true,
     state: true,
+    isOwner: true,
     services: {
         where: { service: { archivedAt: null } },
         select: { service: { select: { id: true, name: true, isActive: true } } }
     }
 };
 
-export const getBarbersService = () => prisma.user.findMany({
-    where: { archivedAt: null, role: { in: Object.keys(teamBarberRoles) } },
+export const getBarbersService = viewerId => prisma.user.findMany({
+    where: {
+        archivedAt: null, role: { in: Object.keys(teamBarberRoles) },
+        OR: [{ isOwner: false }, { role: { not: 'ADMIN' } }, { id: viewerId }]
+    },
     select: barberSelect,
     orderBy: [{ name: 'asc' }, { id: 'asc' }]
 });
@@ -27,7 +31,7 @@ export const getBarbersService = () => prisma.user.findMany({
 async function lockBarber(tx, id, teamOnly) {
     // Coordina las bajas con las reservas en curso y los cambios de perfil.
     const [barber] = await tx.$queryRaw`
-        SELECT "role", "photo" FROM "User" WHERE "id" = ${id} AND "archivedAt" IS NULL FOR UPDATE
+        SELECT "role", "photo", "isOwner", "commissionRate" FROM "User" WHERE "id" = ${id} AND "archivedAt" IS NULL FOR UPDATE
     `;
     if (!barber || (teamOnly && !Object.hasOwn(teamBarberRoles, barber.role))) {
         throw { statusCode: 404, message: 'Usuario no encontrado' };
@@ -54,10 +58,26 @@ export async function getServiceAssignments(tx, serviceIds) {
     return ids.map(serviceId => ({ serviceId }));
 }
 
-export const updateBarberService = (id, data, teamOnly) => prisma.$transaction(async tx => {
+export const updateBarberService = (id, data, teamOnly, actor) => prisma.$transaction(async tx => {
     const barber = await lockBarber(tx, id, teamOnly);
     const { services, ...profile } = data;
-    if (teamOnly && !barberPhotoSchema.safeParse(profile.photo ?? barber.photo).success) {
+    if (profile.commissionRate !== undefined && profile.commissionRate !== barber.commissionRate &&
+        ((profile.role ?? barber.role) === 'ADMIN' || (actor.role === 'BARBER_BOSS' && actor.id === id))) {
+        throw { statusCode: 403, message: 'Esta cuenta no permite modificar la comisión desde tu perfil.' };
+    }
+    if (profile.role && profile.role !== barber.role) {
+        if (actor.role === 'BARBER_BOSS' && barber.role === 'ADMIN') {
+            throw { statusCode: 403, message: adminProtection };
+        }
+        if (actor.role === 'BARBER_BOSS' && profile.role === 'ADMIN') {
+            throw { statusCode: 403, message: adminGrantProtection };
+        }
+        if (barber.isOwner) throw { statusCode: 403, message: 'No puedes cambiar el rol de la cuenta propietaria.' };
+    }
+    if (barber.isOwner && barber.role === 'ADMIN' && actor.id !== id) {
+        throw { statusCode: 403, message: 'Solo la cuenta propietaria puede editar su perfil.' };
+    }
+    if (teamOnly && (profile.role ?? barber.role) !== 'ADMIN' && !barberPhotoSchema.safeParse(profile.photo ?? barber.photo).success) {
         throw { statusCode: 400, message: 'Agrega una foto válida antes de guardar o reactivar al barbero.' };
     }
 
@@ -74,8 +94,12 @@ export const updateBarberService = (id, data, teamOnly) => prisma.$transaction(a
     return tx.user.update({ where: { id }, data: profile, select: barberSelect });
 });
 
-export const deactivateBarberService = (id, { archive = false } = {}) => prisma.$transaction(async tx => {
-    await lockBarber(tx, id, true);
+export const deactivateBarberService = (id, actor, { archive = false } = {}) => prisma.$transaction(async tx => {
+    const barber = await lockBarber(tx, id, true);
+    if (actor.role === 'BARBER_BOSS' && barber.role === 'ADMIN') {
+        throw { statusCode: 403, message: adminProtection };
+    }
+    if (barber.isOwner) throw { statusCode: 403, message: 'No puedes retirar ni desactivar la cuenta propietaria.' };
     const openAppointments = await tx.appointment.count({
         where: {
             barberId: id,
@@ -94,3 +118,40 @@ export const deactivateBarberService = (id, { archive = false } = {}) => prisma.
     if (archive) data.archivedAt = new Date();
     return tx.user.update({ where: { id }, data, select: barberSelect });
 });
+
+const affiliateProfileSelect = {
+    id: true, name: true, role: true, phone: true, description: true, photo: true,
+    services: {
+        where: { service: { archivedAt: null } },
+        select: { service: { select: { id: true, name: true, isActive: true } } }
+    }
+};
+
+export const getDashboardProfile = actor => prisma.user.findUniqueOrThrow({
+    where: { id: actor.id },
+    select: actor.role === 'BARBER_AFFILIATE' ? affiliateProfileSelect : { id: true, name: true, role: true, photo: true }
+});
+
+export async function updateAffiliateProfile(id, data) {
+    try {
+        return await prisma.$transaction(async tx => {
+            const [user] = await tx.$queryRaw`
+                SELECT "phone" FROM "User"
+                WHERE "id" = ${id} AND "state" AND "archivedAt" IS NULL AND "role" = 'BARBER_AFFILIATE' FOR UPDATE
+            `;
+            if (!user) throw { statusCode: 403, message: 'El perfil ya no está disponible.' };
+
+            const profile = await tx.user.update({ where: { id }, data, select: affiliateProfileSelect });
+            if (user.phone !== data.phone) {
+                await tx.passwordResetToken.updateMany({
+                    where: { phone: { in: [user.phone, data.phone] }, used: false },
+                    data: { used: true }
+                });
+            }
+            return profile;
+        });
+    } catch (error) {
+        if (error.code === 'P2002') throw { statusCode: 409, message: 'Ese teléfono ya pertenece a otra cuenta.' };
+        throw error;
+    }
+}

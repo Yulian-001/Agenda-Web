@@ -1,3 +1,4 @@
+import { publiclyBookable } from '../../../../config/barberRoles';
 import { NextResponse } from 'next/server';
 import { prisma } from '../../../../utils/prisma';
 import { handleApiError } from '../../../../utils/errorHandler';
@@ -52,7 +53,7 @@ export async function GET(request) {
         else end.setUTCDate(end.getUTCDate() + 1);
         const [today, now] = scheduleNow();
 
-        const where = serviceId ? { services: { some: { serviceId, service: { isActive: true, archivedAt: null } } } } : {};
+        const where = serviceId ? { ...publiclyBookable, services: { some: { serviceId, service: { isActive: true, archivedAt: null } } } } : publiclyBookable;
         const schedule = await loadScheduleRange(prisma, barberId, startDate, dateKey(end), where);
         if (serviceId && !schedule) {
             return NextResponse.json({
@@ -62,7 +63,7 @@ export async function GET(request) {
         }
 
         const appointments = schedule ? await prisma.appointment.findMany({
-            where: { barberId, date: { gte: start, lt: end } },
+            where: { barberId, date: { gte: start, lt: end }, state: { not: 'CANCELLED' } },
             select: { date: true, timeSlot: true }
         }) : [];
         const bookings = groupByDate(appointments);

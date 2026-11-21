@@ -29,7 +29,7 @@ export async function POST(request) {
             }
         });
         return NextResponse.json({
-            message: 'Si el número está registrado, se generará un código. En desarrollo se muestra en la terminal.',
+            message: 'Si el número tiene un correo verificado, recibirás allí el código de recuperación.',
             expiresAt, resendAt, serverTime: new Date()
         });
     } catch (error) {

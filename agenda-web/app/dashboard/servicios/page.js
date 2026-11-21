@@ -1,20 +1,19 @@
-import { redirect } from 'next/navigation';
+import { catalogManagers } from '../../../config/barberRoles';
+import { notFound, redirect } from 'next/navigation';
 import { verifyAuth } from '../../../utils/auth';
 import { getServicesService } from '../../../services/service.service';
 import ServicesEditor from './ServicesEditor';
 
 export default async function ServiciosPage() {
-    let user;
     try {
-        user = await verifyAuth();
+        await verifyAuth(catalogManagers);
     } catch (error) {
         if (error.statusCode === 401) redirect('/login');
+        if (error.statusCode === 403) notFound();
         throw error;
     }
 
-    const canManageState = user.role === 'ADMIN';
-    const canEdit = ['ADMIN', 'BARBER_BOSS', 'BARBER_INDEPENDENT'].includes(user.role);
-    const initialServices = await getServicesService(canManageState);
+    const initialServices = await getServicesService(true);
 
-    return <ServicesEditor initialServices={initialServices} canManageState={canManageState} canEdit={canEdit} />;
+    return <ServicesEditor initialServices={initialServices} canManageState canEdit />;
 }

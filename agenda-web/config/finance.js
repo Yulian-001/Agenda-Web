@@ -1,4 +1,4 @@
-export const financeRoles = ['ADMIN', 'BARBER_BOSS'];
+export { teamManagers as financeRoles } from './barberRoles';
 
 export const settlementDirections = {
     BUSINESS_PAYS_BARBER: 'El negocio liquida al barbero',

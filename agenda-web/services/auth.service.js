@@ -5,7 +5,7 @@ import { setTimeout as delay } from 'node:timers/promises';
 import { accountLockMs, maxCodeFailures, maxLoginFailures, recoveryDurationMs } from '../config/auth';
 import { prisma } from '../utils/prisma';
 import jwt from 'jsonwebtoken';
-import { logger } from '../utils/logger';
+import { queueEmail } from '../utils/mail.mjs';
 import { getServiceAssignments } from './user.service';
 
 
@@ -16,6 +16,11 @@ export const createUserService = async (data) => {
 
     try {
         return await prisma.$transaction(async tx => {
+            await tx.$queryRaw`SELECT 1::int FROM (SELECT pg_advisory_xact_lock(20261121)) AS lock`;
+            const soloOwner = await tx.user.findFirst({ where: { isOwner: true, role: 'BARBER_INDEPENDENT' }, select: { id: true } });
+            if (soloOwner || profile.role === 'BARBER_INDEPENDENT') {
+                throw { statusCode: 403, message: 'La modalidad independiente se configura desde la seed y admite una sola cuenta.' };
+            }
             const assignments = await getServiceAssignments(tx, services);
             return tx.user.create({
                 data: {
@@ -49,7 +54,7 @@ const lockedAccount = lockUntil => ({
 export const loginUserService = async (phone, password) => {
     const result = await prisma.$transaction(async tx => {
         const user = await lockAccount(tx, phone);
-        if (!user) return { error: invalidCredentials };
+        if (!user || (user.role === 'BARBER_INDEPENDENT' && !user.isOwner)) return { error: invalidCredentials };
         const now = new Date();
         if (user.lockUntil > now) return { error: lockedAccount(user.lockUntil) };
 
@@ -75,16 +80,16 @@ function codeDigest(phone, code) {
 }
 
 export function ensureRecoveryAvailable() {
-    if (process.env.NODE_ENV === 'production') {
+    if (!process.env.APP_PUBLIC_URL) {
         throw { statusCode: 503, message: 'La recuperación por código todavía no está disponible. Contacta al administrador.' };
     }
 }
 
 export const generateOTPService = async (phone, requestedAt, expiresAt) => {
     ensureRecoveryAvailable();
-    const code = await prisma.$transaction(async tx => {
+    await prisma.$transaction(async tx => {
         const account = await lockAccount(tx, phone);
-        if (!account || expiresAt <= new Date()) return;
+        if (!account?.email || !account.emailVerifiedAt || expiresAt <= new Date()) return;
 
         const newer = await tx.passwordResetToken.findFirst({
             where: { phone, createdAt: { gte: requestedAt } }, select: { id: true }
@@ -93,13 +98,11 @@ export const generateOTPService = async (phone, requestedAt, expiresAt) => {
 
         const otp = String(randomInt(1000000)).padStart(6, '0');
         await tx.passwordResetToken.updateMany({ where: { phone, used: false }, data: { used: true } });
-        await tx.passwordResetToken.create({
+        const token = await tx.passwordResetToken.create({
             data: { phone, otpCode: codeDigest(phone, otp).toString('hex'), expiresAt, createdAt: requestedAt }
         });
-        return otp;
+        await queueEmail(tx, 'RECOVERY', { userId: account.id, to: account.email, tokenId: token.id, code: otp }, { expiresAt });
     });
-
-    if (code) logger.dev(`OTP PARA ${phone}: [ ${code} ]`);
 };
 
 const invalidRecoveryCode = {
@@ -121,7 +124,7 @@ async function processRecoveryCode(phone, otpCode, newPassword) {
         const stored = token ? Buffer.from(token.otpCode, 'hex') : emptyDigest;
         const expected = codeDigest(phone, otpCode);
         const matches = timingSafeEqual(stored.length === expected.length ? stored : emptyDigest, expected);
-        if (!account || !token) return null;
+        if (!account?.emailVerifiedAt || !token) return null;
         if (!matches) {
             const failedAttempts = token.failedAttempts + 1;
             await tx.passwordResetToken.update({

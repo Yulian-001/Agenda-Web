@@ -66,6 +66,7 @@ export default function BookingSchedule({ barberId, serviceId, selection, today 
     const [reviewing, setReviewing] = useState(false);
     const [clientName, setClientName] = useState('');
     const [clientPhone, setClientPhone] = useState('');
+    const [clientEmail, setClientEmail] = useState('');
     const [error, setError] = useState('');
     const [sending, setSending] = useState(false);
     const [receipt, setReceipt] = useState(null);
@@ -133,7 +134,7 @@ export default function BookingSchedule({ barberId, serviceId, selection, today 
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
                     barberId, serviceId, date, timeSlot: selected,
-                    clientName: clientName.trim(), clientPhone: clientPhone.trim()
+                    clientName: clientName.trim(), clientPhone: clientPhone.trim(), clientEmail: clientEmail.trim()
                 })
             });
             const data = await res.json();
@@ -240,6 +241,11 @@ export default function BookingSchedule({ barberId, serviceId, selection, today 
                                 <span>Teléfono</span>
                                 <input className={inputStyle} name="clientPhone" type="tel" autoComplete="tel-national" pattern="[0-9]{10}" maxLength={10} required disabled={sending}
                                     value={clientPhone} onChange={event => setClientPhone(event.target.value)} />
+                            </label>
+                            <label className="block space-y-1.5 text-sm font-semibold text-brand-text">
+                                Correo electrónico
+                                <input className={inputStyle} name="clientEmail" type="email" autoComplete="email" required maxLength={254} disabled={sending}
+                                    value={clientEmail} onChange={event => setClientEmail(event.target.value)} />
                             </label>
                             {(unavailableDay || lostSelection) && <p role="status" className="rounded-xl border border-amber-200 bg-amber-50 p-3 text-sm text-amber-900">
                                 {unavailableDay ? 'Ya no quedan horas libres para esta fecha. Vuelve para elegir otro día.' : 'La hora elegida dejó de estar disponible. Vuelve para elegir otra.'}

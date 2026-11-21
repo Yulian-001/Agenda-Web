@@ -4,6 +4,10 @@ import { civilDate, scheduleNow, scheduleRoles, slotKey, standardHours, weekdayO
 
 const wholeDate = '';
 const team = { role: { in: scheduleRoles }, archivedAt: null };
+const soloSchedule = id => ({ id, role: 'BARBER_INDEPENDENT', archivedAt: null, isOwner: true });
+const scheduleTargetSql = id => id
+    ? Prisma.sql`"id" = ${id} AND "role" = 'BARBER_INDEPENDENT' AND "isOwner"`
+    : Prisma.sql`"role" IN ('BARBER_AFFILIATE', 'BARBER_BOSS')`;
 const openStates = ['PENDING', 'CONFIRMED'];
 
 function enabledHours(rows) {
@@ -32,9 +36,9 @@ function checkClosures(appointments) {
     };
 }
 
-export async function getWeeklySchedule() {
+export async function getWeeklySchedule(ownerId) {
     const users = await prisma.user.findMany({
-        where: team,
+        where: ownerId ? soloSchedule(ownerId) : team,
         orderBy: { name: 'asc' },
         select: { id: true, name: true, role: true, state: true, businessHours: true }
     });
@@ -106,8 +110,8 @@ export function dailySlots(schedule) {
     });
 }
 
-export async function getIndividualSchedule(barberId, date) {
-    const schedule = await loadDailySchedule(prisma, barberId, civilDate(date), team);
+export async function getIndividualSchedule(barberId, date, ownerId) {
+    const schedule = await loadDailySchedule(prisma, barberId, civilDate(date), ownerId ? soloSchedule(ownerId) : team);
     if (!schedule) throw { statusCode: 404, message: 'Barbero del equipo no encontrado.' };
     return {
         name: schedule.name,
@@ -121,11 +125,11 @@ function uniqueChanges(changes) {
     return [...new Map(changes.map(change => [change.day + change.timeSlot, change])).values()];
 }
 
-export const updateWeeklySchedule = changes => prisma.$transaction(async tx => {
+export const updateWeeklySchedule = (changes, ownerId) => prisma.$transaction(async tx => {
     // El mismo bloqueo por usuario serializa estos cambios con reservas, excepciones y bajas.
     const users = await tx.$queryRaw`
         SELECT "id" FROM "User"
-        WHERE "archivedAt" IS NULL AND "role" IN ('BARBER_AFFILIATE', 'BARBER_BOSS')
+        WHERE "archivedAt" IS NULL AND ${scheduleTargetSql(ownerId)}
         ORDER BY "id" FOR UPDATE
     `;
     if (!users.length) throw { statusCode: 409, message: 'Todavía no hay barberos afiliados o jefes en el equipo.' };
@@ -177,10 +181,10 @@ export const updateWeeklySchedule = changes => prisma.$transaction(async tx => {
     return barberIds.length;
 }, { timeout: 15000 });
 
-export const updateIndividualSchedule = (barberId, draft) => prisma.$transaction(async tx => {
+export const updateIndividualSchedule = (barberId, draft, ownerId) => prisma.$transaction(async tx => {
     const [barber] = await tx.$queryRaw`
         SELECT "id" FROM "User" WHERE "id" = ${barberId} AND "archivedAt" IS NULL
-        AND "role" IN ('BARBER_AFFILIATE', 'BARBER_BOSS') FOR UPDATE
+        AND ${scheduleTargetSql(ownerId)} FOR UPDATE
     `;
     if (!barber) throw { statusCode: 404, message: 'Barbero del equipo no encontrado.' };
     const [today, now] = scheduleNow();

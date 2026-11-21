@@ -50,6 +50,7 @@ export const dailyScheduleSchema = z.object({
 ) && (data.wholeDay !== undefined || Object.keys(data.hours).length > 0), 'Selecciona horas o una opción para todo el día.');
 
 export const createAppointmentSchema = z.object({
+    clientEmail: z.string().trim().email('Ingresa un correo válido para recibir la reserva.').max(254).transform(email => email.toLowerCase()),
     clientName: z.string().min(2, "El nombre es requerido").trim(),
     clientPhone: z.string().length(10, "El teléfono debe tener 10 dígitos").trim(),
     barberId: z.string().uuid("ID de barbero inválido"),
@@ -105,6 +106,13 @@ export const updateOwnProfileSchema = updateUserSchema.pick({
     description: true,
     haveWhatsApp: true
 }).strict();
+
+export const affiliateProfileSchema = z.strictObject({
+    name: z.string().trim().min(2, 'Escribe un nombre de al menos 2 caracteres.'),
+    phone: z.string().trim().regex(/^3\d{9}$/, 'El teléfono debe tener 10 dígitos e iniciar con 3.'),
+    description: z.string().trim().min(5, 'Escribe una descripción de al menos 5 caracteres.'),
+    photo: barberPhotoSchema
+});
 
 const recoveryPhone = z.string().trim().regex(/^\d{10}$/, 'Ingresa un número de teléfono de diez dígitos.');
 
