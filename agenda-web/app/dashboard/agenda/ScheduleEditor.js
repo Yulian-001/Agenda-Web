@@ -39,7 +39,7 @@ function conflictDate(date) {
         .format(new Date(date + 'T00:00:00Z'));
 }
 
-export default function ScheduleEditor({ initialSchedule, today, initialDay }) {
+export default function ScheduleEditor({ initialSchedule, today, initialDay, individual }) {
     const [weekly, setWeekly] = useState(initialSchedule);
     const [daily, setDaily] = useState(null);
     const [mode, setMode] = useState('weekly');
@@ -190,9 +190,9 @@ export default function ScheduleEditor({ initialSchedule, today, initialDay }) {
                 </div>
                 <div className="flex flex-wrap gap-1 rounded-xl bg-slate-100 p-1" aria-label="Tipo de agenda">
                     <button type="button" disabled={saving} aria-pressed={general} className={modeStyle(general)}
-                        onClick={() => { setMode('weekly'); setResult(null); }}><UsersRound size={17} /> General</button>
+                        onClick={() => { setMode('weekly'); setResult(null); }}><UsersRound size={17} /> {individual ? 'Semanal' : 'General'}</button>
                     <button type="button" disabled={saving} aria-pressed={!general} className={modeStyle(!general)}
-                        onClick={() => { setMode('individual'); setLoadingError(''); setResult(null); }}><UserRound size={17} /> Individual</button>
+                        onClick={() => { setMode('individual'); setLoadingError(''); setResult(null); }}><UserRound size={17} /> {individual ? 'Por fecha' : 'Individual'}</button>
                 </div>
             </header>
 
@@ -200,7 +200,7 @@ export default function ScheduleEditor({ initialSchedule, today, initialDay }) {
                 {general ? (
                     <div className="space-y-4">
                         <div>
-                            <h2 className="font-bold text-slate-950">Horario semanal del equipo</h2>
+                            <h2 className="font-bold text-slate-950">{individual ? 'Mi horario semanal' : 'Horario semanal del equipo'}</h2>
                             <p className="text-sm text-slate-600">Edita un día y copia sus horas donde quieras repetirlas. Guarda la semana cuando termines de ajustar cada día.</p>
                         </div>
                         <div className="grid grid-cols-2 gap-2 sm:grid-cols-4 xl:grid-cols-7" aria-label="Días de la semana">
@@ -218,17 +218,17 @@ export default function ScheduleEditor({ initialSchedule, today, initialDay }) {
                                 </button>;
                             })}
                         </div>
-                        <p className="text-xs text-slate-500">{weekly.members.length} afiliados y jefes · Las excepciones por fecha tienen prioridad.</p>
+                        <p className="text-xs text-slate-500">{!individual && weekly.members.length + ' afiliados y jefes · '}Las excepciones por fecha tienen prioridad.</p>
                     </div>
                 ) : (
                     <div className="grid gap-4 sm:grid-cols-2">
-                        <label className="space-y-1 text-sm font-semibold text-slate-800">
+                        {!individual && <label className="space-y-1 text-sm font-semibold text-slate-800">
                             <span>Barbero</span>
                             <select className="block w-full rounded-xl border border-slate-200 bg-white p-3" value={barber}
                                 onChange={event => changeTarget(setBarber, event.target.value)} disabled={!weekly.members.length}>
                                 {weekly.members.map(person => <option key={person.id} value={person.id}>{person.name} · {teamBarberRoles[person.role]}{person.state ? '' : ' (inactivo)'}</option>)}
                             </select>
-                        </label>
+                        </label>}
                         <label className="space-y-1 text-sm font-semibold text-slate-800">
                             <span>Fecha</span>
                             <input type="date" min={today} value={date} className="block w-full rounded-xl border border-slate-200 bg-white p-3"

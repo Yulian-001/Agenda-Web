@@ -1,7 +1,13 @@
+import { redirect } from 'next/navigation';
 import { scheduleNow } from '../../../config/schedule';
+import { verifyAuth } from '../../../utils/auth';
 import AppointmentBoard from '../../../components/AppointmentBoard';
 
-export default function DailyAppointmentsPage() {
+export default async function DailyAppointmentsPage() {
     const [today] = scheduleNow();
-    return <AppointmentBoard mode="today" initialDate={today} />;
+    const { role } = await verifyAuth().catch(error => {
+        if (error.statusCode === 401) redirect('/login');
+        throw error;
+    });
+    return <AppointmentBoard mode="today" initialDate={today} role={role} />;
 }

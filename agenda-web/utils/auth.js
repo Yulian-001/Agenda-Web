@@ -18,9 +18,9 @@ export const verifyAuth = async (allowedRoles = []) => {
     if (typeof payload.id !== 'string') throw { statusCode: 401, message: 'Sesión inválida.' };
     const user = await prisma.user.findUnique({
         where: { id: payload.id },
-        select: { id: true, role: true, name: true, state: true, archivedAt: true }
+        select: { id: true, role: true, name: true, isOwner: true, state: true, archivedAt: true }
     });
-    if (!user?.state || user.archivedAt || user.role !== payload.role) {
+    if (!user?.state || user.archivedAt || user.role !== payload.role || (user.role === 'BARBER_INDEPENDENT' && !user.isOwner)) {
         throw { statusCode: 401, message: 'La sesión ya no es válida. Inicie sesión de nuevo.' };
     }
     if (allowedRoles.length && !allowedRoles.includes(user.role)) {

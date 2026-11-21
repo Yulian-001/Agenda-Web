@@ -48,3 +48,15 @@ You can check out [the Next.js GitHub repository](https://github.com/vercel/next
 The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
 
 Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+
+## Cuenta inicial del negocio
+
+Tras aplicar las migraciones, configura `SEED_OWNER_PHONE` (por defecto, `3144533840`) y `SEED_OWNER_PASSWORD` en el entorno privado y ejecuta `pnpm seed`. El rol por defecto es `ADMIN`. Selecciona la modalidad antes de crear la primera cuenta:
+
+- `SEED_OWNER_ROLE=ADMIN` inicia un negocio con equipo y un titular que gestiona la operación.
+- `SEED_OWNER_ROLE=BARBER_BOSS` inicia un negocio con equipo y un titular que también atiende citas.
+- `SEED_OWNER_ROLE=BARBER_INDEPENDENT` requiere una base sin cuentas de personal. El titular administra su catálogo, agenda y contabilidad, y es la única cuenta operativa. Los servicios que crea se le asignan automáticamente.
+
+Para un titular que atiende citas, configura también `SEED_OWNER_PHOTO`. Completa el catálogo y la agenda desde el panel.
+
+La cuenta sembrada es la cuenta del titular. Si su rol es `ADMIN`, solo ella ve su ficha en la gestión del equipo y queda excluida de las reservas públicas. El comando se puede repetir conservando el usuario existente, su modalidad y su contraseña. Usa una contraseña exclusiva por despliegue y elimina el valor inicial del entorno una vez creada la cuenta.

@@ -1,3 +1,4 @@
+import { teamManagers } from '../config/barberRoles';
 // services/appointment.service.js
 import { prisma } from '../utils/prisma';
 import { logger } from '../utils/logger';
@@ -27,7 +28,7 @@ export const createAppointmentService = async (data) => {
         const appointment = await prisma.$transaction(async tx => {
             // La reserva mantiene activo al profesional hasta que termine su escritura.
             const [barber] = await tx.$queryRaw`
-                SELECT "id" FROM "User" WHERE "id" = ${barberId} AND "state" = true AND "archivedAt" IS NULL FOR SHARE
+                SELECT "id" FROM "User" WHERE "id" = ${barberId} AND "state" = true AND "archivedAt" IS NULL AND ("role" IN ('BARBER_BOSS', 'BARBER_AFFILIATE') OR ("role" = 'BARBER_INDEPENDENT' AND "isOwner")) FOR SHARE
             `;
             if (!barber) throw { statusCode: 400, code: 'SELECTION_UNAVAILABLE', message: 'El barbero ya no está disponible para reservar. Elige otro barbero.' };
 
@@ -48,7 +49,7 @@ export const createAppointmentService = async (data) => {
 
             const timeVariants = timeSlot.startsWith('0') ? [timeSlot, timeSlot.slice(1)] : [timeSlot];
             const booked = await tx.appointment.findFirst({
-                where: { barberId, date: bookingDate, timeSlot: { in: timeVariants } },
+                where: { barberId, date: bookingDate, timeSlot: { in: timeVariants }, state: { not: 'CANCELLED' } },
                 select: { id: true }
             });
             if (booked) throw { statusCode: 409, message: 'Este horario ya está ocupado.' };
@@ -104,8 +105,9 @@ export const getAppointmentsService = async (user, { date, view }) => {
         where.date = { gte: start, lt: new Date(start.getTime() + 24 * 60 * 60 * 1000) };
     }
 
-    const canViewTeam = ['ADMIN', 'BARBER_BOSS'].includes(user.role);
-    if (view === 'personal' || !canViewTeam) where.barberId = user.id;
+    const canViewTeam = teamManagers.includes(user.role);
+    if (view !== 'team' || !canViewTeam) where.barberId = user.id;
+    else where.barber = { ...where.barber, role: { not: 'BARBER_INDEPENDENT' } };
 
     const appointments = await prisma.appointment.findMany({
         where,
@@ -134,11 +136,11 @@ export const getAppointmentsService = async (user, { date, view }) => {
 
 async function changeAppointmentState(tx, appointment, state, actor, financeSnapshot) {
     const { count } = await tx.appointment.updateMany({
-        where: { id: appointment.id, state: { in: openStates } },
+        where: { id: appointment.id, state: { in: state === 'CONFIRMED' ? ['PENDING'] : openStates } },
         data: { state, ...financeSnapshot }
     });
     if (!count) {
-        throw { statusCode: 409, message: 'La cita ya fue cancelada o completada. Revisa su estado.' };
+        throw { statusCode: 409, message: 'La cita ya cambió de estado. Revisa su estado actual.' };
     }
 
     return tx.historyAppointment.create({
@@ -154,13 +156,18 @@ export const updateAppointmentStatusService = (appointmentId, newState, user) =>
     const appointment = await tx.appointment.findUnique({ where: { id: appointmentId } });
     if (!appointment) throw { statusCode: 404, message: 'Cita no encontrada' };
 
-    if (appointment.barberId !== user.id && !['ADMIN', 'BARBER_BOSS'].includes(user.role)) {
+    if (appointment.barberId !== user.id && !teamManagers.includes(user.role)) {
         throw { statusCode: 403, message: 'No tienes permiso para modificar esta cita.' };
     }
 
     await ensureBarberInOperation(tx, appointment.barberId);
     let financeSnapshot;
     if (newState === 'COMPLETED') {
+        const [today, now] = scheduleNow();
+        const day = appointment.date.toISOString().slice(0, 10);
+        if (day > today || (day === today && slotKey(appointment.timeSlot) > now)) {
+            throw { statusCode: 409, message: 'Solo puedes completar una cita cuando llegue su hora de inicio.' };
+        }
         const barber = await tx.user.findUnique({
             where: { id: appointment.barberId },
             select: { role: true, commissionRate: true, settlementDirection: true }

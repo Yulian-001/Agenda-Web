@@ -16,6 +16,11 @@ export const createUserService = async (data) => {
 
     try {
         return await prisma.$transaction(async tx => {
+            await tx.$queryRaw`SELECT 1::int FROM (SELECT pg_advisory_xact_lock(20261121)) AS lock`;
+            const soloOwner = await tx.user.findFirst({ where: { isOwner: true, role: 'BARBER_INDEPENDENT' }, select: { id: true } });
+            if (soloOwner || profile.role === 'BARBER_INDEPENDENT') {
+                throw { statusCode: 403, message: 'La modalidad independiente se configura desde la seed y admite una sola cuenta.' };
+            }
             const assignments = await getServiceAssignments(tx, services);
             return tx.user.create({
                 data: {
@@ -49,7 +54,7 @@ const lockedAccount = lockUntil => ({
 export const loginUserService = async (phone, password) => {
     const result = await prisma.$transaction(async tx => {
         const user = await lockAccount(tx, phone);
-        if (!user) return { error: invalidCredentials };
+        if (!user || (user.role === 'BARBER_INDEPENDENT' && !user.isOwner)) return { error: invalidCredentials };
         const now = new Date();
         if (user.lockUntil > now) return { error: lockedAccount(user.lockUntil) };
 

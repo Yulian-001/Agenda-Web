@@ -4,7 +4,7 @@ import { useEffect, useState } from 'react';
 import { CheckCircle, Edit, Loader2, Plus, Trash2, User, XCircle } from 'lucide-react';
 import { announceScheduleChange } from '../../../utils/liveSchedule';
 import BarberPhotoField from '../../../components/BarberPhotoField';
-import { teamBarberRoles } from '../../../config/barberRoles';
+import { adminProtection, teamBarberRoles } from '../../../config/barberRoles';
 
 const fieldClass = 'w-full rounded-xl border border-gray-200 bg-gray-50 p-3';
 const newBarber = {
@@ -30,8 +30,10 @@ async function loadBarbers(signal) {
     return { ...team, catalog: catalog.services };
 }
 
-function BarberForm({ barber, catalog, viewerId, pending, error, onCancel, onSave }) {
+function BarberForm({ barber, catalog, viewerId, viewerRole, pending, error, onCancel, onSave }) {
     const editing = Boolean(barber);
+    const canChangeRole = !editing || (barber.id !== viewerId && !barber.isOwner &&
+        !(viewerRole === 'BARBER_BOSS' && barber.role === 'ADMIN'));
     const [form, setForm] = useState(() => barber ? {
         name: barber.name, description: barber.description, photo: barber.photo, role: barber.role,
         commissionRate: barber.commissionRate, haveWhatsApp: barber.haveWhatsApp,
@@ -56,7 +58,7 @@ function BarberForm({ barber, catalog, viewerId, pending, error, onCancel, onSav
     function save(event) {
         event.preventDefault();
         if (pending || processingPhoto) return;
-        if (!form.photo || readyPhoto !== form.photo) {
+        if (form.role !== 'ADMIN' && (!form.photo || readyPhoto !== form.photo)) {
             setPhotoError(form.photo ? 'Usa una foto que se pueda ver en la vista previa.' : 'Agrega la foto del barbero para continuar.');
             return;
         }
@@ -97,8 +99,10 @@ function BarberForm({ barber, catalog, viewerId, pending, error, onCancel, onSav
                         <div className="grid grid-cols-2 gap-4">
                             <label className="block text-sm font-semibold text-gray-600">
                                 Rol
-                                <select className={fieldClass} disabled={editing && barber.id === viewerId} value={form.role} onChange={event => setField('role', event.target.value)}>
-                                    {Object.entries(teamBarberRoles).map(([value, label]) => <option key={value} value={value}>{label}</option>)}
+                                <select className={fieldClass} disabled={!canChangeRole} value={form.role} onChange={event => setField('role', event.target.value)}>
+                                    {Object.entries(teamBarberRoles)
+                                        .filter(([value]) => value !== 'ADMIN' || viewerRole === 'ADMIN' || barber?.role === 'ADMIN')
+                                        .map(([value, label]) => <option key={value} value={value}>{label}</option>)}
                                 </select>
                             </label>
                             <label className="block text-sm font-semibold text-gray-600">
@@ -186,7 +190,22 @@ export default function BarberosPage() {
         }
     }
 
+    function warnProtected(barber) {
+        if (team.viewerRole === 'BARBER_BOSS' && barber.role === 'ADMIN') {
+            setNotice('');
+            setError(adminProtection);
+            return true;
+        }
+        if (barber.isOwner) {
+            setNotice('');
+            setError('No puedes retirar ni desactivar la cuenta propietaria.');
+            return true;
+        }
+        return false;
+    }
+
     function toggleState(barber) {
+        if (warnProtected(barber)) return;
         const message = barber.state
             ? `¿Quieres desactivar a ${barber.name}? Dejará de aparecer en las reservas y se conservará su historial.`
             : `¿Quieres reactivar a ${barber.name}?`;
@@ -196,6 +215,7 @@ export default function BarberosPage() {
     }
 
     function archiveBarber(barber) {
+        if (warnProtected(barber)) return;
         const confirmed = window.confirm(
             `¿Quieres eliminar a ${barber.name} del equipo? Su perfil desaparecerá del panel y de reservas. Sus citas e historial se conservarán.`
         );
@@ -264,7 +284,7 @@ export default function BarberosPage() {
             </div>
 
             {dialog && (
-                <BarberForm barber={dialog.barber} catalog={team.catalog} viewerId={team.viewerId} pending={pending} error={error}
+                <BarberForm barber={dialog.barber} catalog={team.catalog} viewerId={team.viewerId} viewerRole={team.viewerRole} pending={pending} error={error}
                     onCancel={() => { setDialog(null); setError(''); }}
                     onSave={(body, id) => mutate(id ? `/api/users/${id}` : '/api/users', id ? 'PUT' : 'POST', body)} />
             )}

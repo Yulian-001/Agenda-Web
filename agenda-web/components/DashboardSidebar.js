@@ -10,18 +10,45 @@ import {
 } from 'lucide-react';
 import BrandLogo from './BrandLogo';
 import business from '../config/business.json';
-import { financeRoles } from '../config/finance';
+import AffiliateProfileDialog from './AffiliateProfileDialog';
+import { catalogManagers, roleLabels, teamManagers } from '../config/barberRoles';
 
 const menuItems = [
     { name: 'Calendario', icon: CalendarDays, path: '/dashboard' },
     { name: 'Reservas Día', icon: CalendarCheck, path: '/dashboard/reservas' },
-    { name: 'Barberos', icon: User, path: '/dashboard/barberos' },
-    { name: 'Servicios', icon: Scissors, path: '/dashboard/servicios' },
-    { name: 'Agenda', icon: Clock, path: '/dashboard/agenda', adminOnly: true },
-    { name: 'Contabilidad', icon: BarChart3, path: '/dashboard/contabilidad', allowedRoles: financeRoles },
+    { name: 'Barberos', icon: User, path: '/dashboard/barberos', allowedRoles: teamManagers },
+    { name: 'Servicios', icon: Scissors, path: '/dashboard/servicios', allowedRoles: catalogManagers },
+    { name: 'Agenda', icon: Clock, path: '/dashboard/agenda', allowedRoles: catalogManagers },
+    { name: 'Contabilidad', icon: BarChart3, path: '/dashboard/contabilidad' },
 ];
 
-function SidebarContent({ userName, role, onNavigate }) {
+function ProfileCard({ profile, onEdit }) {
+    const { name, role, photo } = profile;
+    const details = <>
+        <span className="relative grid size-11 shrink-0 place-items-center overflow-hidden rounded-full bg-brand-on-primary/15">
+            <User size={20} aria-hidden="true" />
+            {photo && (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img key={photo} src={photo} alt="" className="absolute inset-0 size-full object-cover"
+                    onError={event => { event.currentTarget.hidden = true; }} />
+            )}
+        </span>
+        <span className="min-w-0">
+            <span className="block break-words text-sm font-bold">{name}</span>
+            <span className="block text-xs text-brand-on-primary/80">{roleLabels[role]}</span>
+        </span>
+    </>;
+    const style = 'flex w-full items-center gap-3 rounded-xl px-3 py-2 text-left';
+    return <div className="shrink-0 border-b border-brand-on-primary/15 px-3 py-3">
+        {role === 'BARBER_AFFILIATE'
+            ? <button type="button" aria-label={'Editar perfil de ' + name} aria-haspopup="dialog" onClick={onEdit}
+                className={style + ' hover:bg-brand-on-primary/10'}>{details}</button>
+            : <div className={style}>{details}</div>}
+    </div>;
+}
+
+function SidebarContent({ profile, onEdit, onNavigate }) {
+    const { role } = profile;
     const pathname = usePathname();
     return (
         <>
@@ -30,16 +57,11 @@ function SidebarContent({ userName, role, onNavigate }) {
                 <span className="wrap-break-word max-w-full text-sm font-bold tracking-wide">{business.brand.name}</span>
             </div>
 
-            {/* Bienvenida */}
-            <div className="px-6 py-4 text-center border-b border-brand-on-primary/15 shrink-0">
-                <p className="text-sm text-brand-on-primary/80">Bienvenido</p>
-                <p className="font-bold text-lg text-brand-on-primary uppercase">{userName}</p>
-            </div>
+            <ProfileCard profile={profile} onEdit={onEdit} />
 
             {/* Menú */}
             <nav className="flex-1 py-4 px-3 flex flex-col gap-2 overflow-y-auto">
-                {menuItems.filter(item => (!item.adminOnly || role === 'ADMIN') &&
-                    (!item.allowedRoles || item.allowedRoles.includes(role))).map((item) => (
+                {menuItems.filter(item => !item.allowedRoles || item.allowedRoles.includes(role)).map((item) => (
                     <Link
                         key={item.name}
                         href={item.path}
@@ -69,15 +91,17 @@ function SidebarContent({ userName, role, onNavigate }) {
     );
 }
 
-export default function DashboardSidebar({ userName, role, children }) {
+export default function DashboardSidebar({ profile, children }) {
     const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+    const [editing, setEditing] = useState(false);
+    const editProfile = () => setEditing(true);
 
     return (
         <div className="flex h-screen bg-brand-background font-sans">
 
             {/* 🖥️ SIDEBAR ESCRITORIO (Fijo) */}
             <aside className="w-72 bg-brand-primary text-brand-on-primary hidden md:flex flex-col shadow-2xl z-20">
-                <SidebarContent userName={userName} role={role} onNavigate={() => setIsMobileMenuOpen(false)} />
+                <SidebarContent profile={profile} onEdit={editProfile} onNavigate={() => setIsMobileMenuOpen(false)} />
             </aside>
 
             {/* 📱 BACKDROP MÓVIL (Fondo oscuro para cerrar al tocar) */}
@@ -97,8 +121,11 @@ export default function DashboardSidebar({ userName, role, children }) {
                         <X size={24} />
                     </button>
                 </div>
-                <SidebarContent userName={userName} role={role} onNavigate={() => setIsMobileMenuOpen(false)} />
+                <SidebarContent profile={profile} onEdit={editProfile} onNavigate={() => setIsMobileMenuOpen(false)} />
             </aside>
+
+            {editing && profile.role === 'BARBER_AFFILIATE' && <AffiliateProfileDialog profile={profile}
+                onClose={() => setEditing(false)} />}
 
             {/* 🟢 CONTENIDO PRINCIPAL */}
             <div className="flex-1 flex flex-col h-full overflow-hidden ">

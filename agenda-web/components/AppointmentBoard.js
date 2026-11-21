@@ -75,7 +75,7 @@ function AppointmentCard({ appointment, onOpen }) {
     );
 }
 
-function AppointmentDialog({ appointment, onClose, onCancel, busy, error }) {
+function AppointmentDialog({ appointment, onClose, onChangeState, busy, error }) {
     const dialog = useRef(null);
 
     useEffect(() => {
@@ -84,6 +84,9 @@ function AppointmentDialog({ appointment, onClose, onCancel, busy, error }) {
         return () => { if (element.open) element.close(); };
     }, []);
 
+    const [today, now] = scheduleNow();
+    const bookingDay = appointment.date.slice(0, 10);
+    const hasStarted = bookingDay < today || (bookingDay === today && appointment.timeSlot <= now);
     const cancellable = ['PENDING', 'CONFIRMED'].includes(appointment.state);
 
     return (
@@ -105,7 +108,11 @@ function AppointmentDialog({ appointment, onClose, onCancel, busy, error }) {
             <div className="mt-4 space-y-3">
                 {appointment.state === 'CANCELLED' && <Cancellation data={appointment.cancellation} />}
                 {error && <p role="alert" className="rounded-xl bg-rose-50 p-3 text-sm text-rose-900">{error}</p>}
-                {cancellable && <button type="button" disabled={busy} onClick={onCancel}
+                {appointment.state === 'PENDING' && <button type="button" disabled={busy} onClick={() => onChangeState('CONFIRMED')}
+                    className="min-h-11 w-full rounded-xl bg-brand-primary px-3 py-2 text-sm font-semibold text-brand-on-primary disabled:opacity-50">Confirmar cita</button>}
+                {cancellable && hasStarted && <button type="button" disabled={busy} onClick={() => onChangeState('COMPLETED')}
+                    className="min-h-11 w-full rounded-xl bg-emerald-800 px-3 py-2 text-sm font-semibold text-white disabled:opacity-50">Completar cita</button>}
+                {cancellable && <button type="button" disabled={busy} onClick={() => onChangeState('CANCELLED')}
                     className="flex min-h-11 w-full items-center justify-center gap-2 rounded-xl bg-rose-700 px-3 py-2 text-sm font-semibold text-white hover:bg-rose-800 disabled:opacity-50">
                     <CalendarX size={17} /> {busy ? 'Cancelando…' : 'Cancelar cita'}
                 </button>}
@@ -120,8 +127,10 @@ function filterOptions(appointments, idField, nameField) {
         .sort((a, b) => a[1].localeCompare(b[1], 'es-CO'));
 }
 
-export default function AppointmentBoard({ mode, initialDate }) {
+export default function AppointmentBoard({ mode, initialDate, role }) {
     const daily = mode === 'today';
+    const [view, setView] = useState(role === 'ADMIN' || (role === 'BARBER_BOSS' && !daily) ? 'team' : 'personal');
+    const canSwitchView = role === 'BARBER_BOSS' && !daily;
     const [businessDay, setBusinessDay] = useState(initialDate);
     const [selectedDate, setSelectedDate] = useState(initialDate);
     const [month, setMonth] = useState(initialDate.slice(0, 7));
@@ -132,7 +141,7 @@ export default function AppointmentBoard({ mode, initialDate }) {
     const [busy, setBusy] = useState(false);
     const [dialogError, setDialogError] = useState('');
     const date = daily ? businessDay : selectedDate;
-    const current = snapshot?.date === date ? snapshot : null;
+    const current = snapshot?.date === date && snapshot.view === view ? snapshot : null;
     const appointments = current?.appointments ?? [];
     const selected = appointments.find(item => item.id === openId);
     const barbers = filterOptions(appointments, 'barberId', 'barberName');
@@ -147,21 +156,21 @@ export default function AppointmentBoard({ mode, initialDate }) {
             const [today] = scheduleNow();
             const queryDate = daily ? today : date;
             try {
-                const res = await fetch('/api/appointments?view=team&date=' + encodeURIComponent(queryDate), { signal, cache: 'no-store' });
+                const res = await fetch('/api/appointments?view=' + view + '&date=' + encodeURIComponent(queryDate), { signal, cache: 'no-store' });
                 const data = await res.json();
                 if (!signal.aborted) {
                     setBusinessDay(today);
-                    if (!res.ok) setSnapshot(previous => ({ date: queryDate, appointments: previous?.date === queryDate ? previous.appointments : [], error: data.error }));
-                    else setSnapshot({ date: queryDate, appointments: data.appointments });
+                    if (!res.ok) setSnapshot(previous => ({ date: queryDate, view, appointments: previous?.date === queryDate && previous.view === view ? previous.appointments : [], error: data.error }));
+                    else setSnapshot({ date: queryDate, view, appointments: data.appointments });
                 }
             } catch {
                 if (!signal.aborted) {
                     setBusinessDay(today);
-                    setSnapshot(previous => ({ date: queryDate, appointments: previous?.date === queryDate ? previous.appointments : [], error: 'No pudimos consultar las citas. Volveremos a intentarlo.' }));
+                    setSnapshot(previous => ({ date: queryDate, view, appointments: previous?.date === queryDate && previous.view === view ? previous.appointments : [], error: 'No pudimos consultar las citas. Volveremos a intentarlo.' }));
                 }
             }
         });
-    }, [busy, daily, date]);
+    }, [busy, daily, date, view]);
 
     function changeDate(next) {
         setSelectedDate(next);
@@ -170,17 +179,26 @@ export default function AppointmentBoard({ mode, initialDate }) {
         setOpenId('');
     }
 
-    async function cancel() {
-        if (busy || !selected || !window.confirm('¿Cancelar la cita de ' + selected.clientName + '?')) return;
+    function changeView(next) {
+        setView(next);
+        setBarberFilter('');
+        setServiceFilter('');
+        setOpenId('');
+    }
+
+    async function changeState(state) {
+        if (busy || !selected) return;
+        if (state === 'CANCELLED' && !window.confirm('¿Cancelar la cita de ' + selected.clientName + '?')) return;
+        if (state === 'COMPLETED' && !window.confirm('¿Marcar la cita como atendida? Su importe se incluirá en Contabilidad.')) return;
         setBusy(true);
         setDialogError('');
         try {
             const res = await fetch('/api/appointments/' + selected.id, {
-                method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ state: 'CANCELLED' })
+                method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ state })
             });
             const data = await res.json();
             if (!res.ok) {
-                setDialogError(data.error || 'No se pudo cancelar la cita.');
+                setDialogError(data.error || 'No se pudo actualizar la cita.');
                 return;
             }
             setSnapshot(previous => previous && ({
@@ -190,7 +208,7 @@ export default function AppointmentBoard({ mode, initialDate }) {
             }));
             announceScheduleChange();
         } catch {
-            setDialogError('No se pudo cancelar la cita. Revisa su estado antes de reintentar.');
+            setDialogError('No se pudo actualizar la cita. Revisa su estado antes de reintentar.');
         } finally {
             setBusy(false);
         }
@@ -202,9 +220,18 @@ export default function AppointmentBoard({ mode, initialDate }) {
                 <span className="shrink-0 rounded-xl bg-brand-primary p-3 text-brand-on-primary"><Icon size={22} aria-hidden="true" /></span>
                 <div>
                     <h1 className="text-2xl font-bold text-stone-950">{daily ? 'Reservas Día' : 'Calendario'}</h1>
-                    <p className="text-sm text-stone-600">{daily ? 'Consulta las citas de hoy.' : 'Selecciona un día para consultar sus citas.'}</p>
+                    <p className="text-sm text-stone-600">{daily ? (view === 'personal' ? 'Consulta tus citas de hoy.' : 'Consulta las citas de hoy del equipo.') : 'Selecciona un día para consultar sus citas.'}</p>
                 </div>
             </header>
+
+            {canSwitchView && <div role="group" aria-label="Vista del calendario" className="flex w-fit flex-wrap gap-1 rounded-xl border border-stone-200 bg-white p-1">
+                {[['team', 'Equipo'], ['personal', 'Mis citas']].map(([value, label]) => (
+                    <button key={value} type="button" disabled={busy} aria-pressed={view === value} onClick={() => changeView(value)}
+                        className={'rounded-lg px-4 py-2 text-sm font-semibold ' + (view === value ? 'bg-brand-primary text-brand-on-primary' : 'text-stone-700 hover:bg-stone-100')}>
+                        {label}
+                    </button>
+                ))}
+            </div>}
 
             <div className={!daily ? 'grid items-start gap-5 xl:grid-cols-[20rem_minmax(0,1fr)]' : ''}>
                 {!daily && <MonthCalendar mode="appointments" month={month} today={businessDay} date={date} onMonthChange={setMonth} onDateChange={changeDate} />}
@@ -214,12 +241,12 @@ export default function AppointmentBoard({ mode, initialDate }) {
                         {current && !current.error && <span className="text-xs text-stone-600">{visible.length} {visible.length === 1 ? 'cita' : 'citas'}</span>}
                     </div>
                     <div className="grid gap-3 sm:grid-cols-2">
-                        <label className="space-y-1 text-sm font-semibold text-stone-700">
+                        {view === 'team' && <label className="space-y-1 text-sm font-semibold text-stone-700">
                             Barbero <select value={barberFilter} onChange={event => setBarberFilter(event.target.value)} className={selectStyle}>
                                 <option value="">Todos los barberos</option>
                                 {barbers.map(([id, name]) => <option key={id} value={id}>{name}</option>)}
                             </select>
-                        </label>
+                        </label>}
                         <label className="space-y-1 text-sm font-semibold text-stone-700">
                             Servicio <select value={serviceFilter} onChange={event => setServiceFilter(event.target.value)} className={selectStyle}>
                                 <option value="">Todos los servicios</option>
@@ -238,7 +265,7 @@ export default function AppointmentBoard({ mode, initialDate }) {
                 </section>
             </div>
 
-            {selected && <AppointmentDialog appointment={selected} busy={busy} error={dialogError} onClose={() => setOpenId('')} onCancel={cancel} />}
+            {selected && <AppointmentDialog appointment={selected} busy={busy} error={dialogError} onClose={() => setOpenId('')} onChangeState={changeState} />}
         </div>
     );
 }

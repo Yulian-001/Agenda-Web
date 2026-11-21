@@ -1,3 +1,4 @@
+import { catalogManagers } from '../../../../config/barberRoles';
 import { NextResponse } from 'next/server';
 import { z } from 'zod';
 import { verifyAuth } from '../../../../utils/auth';
@@ -9,7 +10,7 @@ const serviceStateSchema = z.strictObject({ isActive: z.boolean() });
 
 export async function PUT(request, { params }) {
     try {
-        await verifyAuth(['ADMIN', 'BARBER_BOSS', 'BARBER_INDEPENDENT']);
+        await verifyAuth(catalogManagers);
 
         const resolvedParams = await params;
         const { id } = resolvedParams;
@@ -33,15 +34,11 @@ export async function PUT(request, { params }) {
 
 export async function PATCH(request, { params }) {
     try {
-        const user = await verifyAuth(['ADMIN', 'BARBER_BOSS', 'BARBER_INDEPENDENT']);
+        await verifyAuth(catalogManagers);
         const validation = serviceStateSchema.safeParse(await request.json().catch(() => null));
         if (!validation.success) {
             return NextResponse.json({ error: 'Selecciona un estado válido para el servicio.' }, { status: 400 });
         }
-        if (validation.data.isActive && user.role !== 'ADMIN') {
-            return NextResponse.json({ error: 'Solo ADMIN puede reactivar un servicio.' }, { status: 403 });
-        }
-
         const { id } = await params;
         const service = await updateServiceService(id, validation.data);
         return NextResponse.json({ message: service.isActive ? 'Servicio reactivado' : 'Servicio desactivado', service });
@@ -52,7 +49,7 @@ export async function PATCH(request, { params }) {
 
 export async function DELETE(request, { params }) {
     try {
-        await verifyAuth(['ADMIN']);
+        await verifyAuth(catalogManagers);
 
         const resolvedParams = await params;
         const { id } = resolvedParams;

@@ -1,3 +1,4 @@
+import { catalogManagers } from '../../../config/barberRoles';
 // app/api/services/route.js
 import { NextResponse } from 'next/server';
 import { verifyAuth } from '../../../utils/auth';
@@ -9,7 +10,7 @@ import { handleApiError } from '../../../utils/errorHandler';
 export async function POST(request) {
     try {
         // ROLES PERMITIDOS
-        await verifyAuth(['ADMIN', 'BARBER_BOSS', 'BARBER_INDEPENDENT']);
+        const actor = await verifyAuth(catalogManagers);
 
         // 2. Validar datos con Zod
         const body = await request.json();
@@ -23,7 +24,7 @@ export async function POST(request) {
         }
 
         // 3. Crear el servicio
-        const newService = await createServiceService(validation.data);
+        const newService = await createServiceService(validation.data, actor.role === 'BARBER_INDEPENDENT' ? actor.id : undefined);
 
         return NextResponse.json({
             message: "Servicio creado exitosamente",
@@ -45,7 +46,7 @@ export async function POST(request) {
 export async function GET(request) {
     try {
         const includeInactive = request.nextUrl.searchParams.get('includeInactive') === 'true';
-        if (includeInactive) await verifyAuth(['ADMIN']);
+        if (includeInactive) await verifyAuth(catalogManagers);
         const services = await getServicesService(includeInactive);
 
         return NextResponse.json({

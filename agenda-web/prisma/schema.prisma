@@ -38,6 +38,7 @@ model User {
     password String
     role Role 
     photo String
+    isOwner Boolean @default(false)
     state Boolean @default(true)
     archivedAt DateTime?
     description String
@@ -108,7 +109,8 @@ model Appointment {
     
     historyAppointment HistoryAppointment[]
 
-    @@unique([barberId, date, timeSlot]) 
+    // Uniqueness of occupied slots is enforced by a partial SQL index.
+    @@index([barberId, date, timeSlot])
 }
 
 

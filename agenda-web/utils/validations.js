@@ -106,6 +106,13 @@ export const updateOwnProfileSchema = updateUserSchema.pick({
     haveWhatsApp: true
 }).strict();
 
+export const affiliateProfileSchema = z.strictObject({
+    name: z.string().trim().min(2, 'Escribe un nombre de al menos 2 caracteres.'),
+    phone: z.string().trim().regex(/^3\d{9}$/, 'El teléfono debe tener 10 dígitos e iniciar con 3.'),
+    description: z.string().trim().min(5, 'Escribe una descripción de al menos 5 caracteres.'),
+    photo: barberPhotoSchema
+});
+
 const recoveryPhone = z.string().trim().regex(/^\d{10}$/, 'Ingresa un número de teléfono de diez dígitos.');
 
 export const forgotPasswordSchema = z.object({ phone: recoveryPhone });

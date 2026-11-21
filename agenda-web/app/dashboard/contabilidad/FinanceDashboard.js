@@ -220,7 +220,30 @@ function SettingsForm({ row, onClose, onSave, busy, error }) {
     );
 }
 
-export default function FinanceDashboard({ today }) {
+const appointmentDate = new Intl.DateTimeFormat('es-CO', { dateStyle: 'medium', timeZone: 'UTC' });
+const appointmentLabels = { PENDING: 'Pendiente', CONFIRMED: 'Confirmada', COMPLETED: 'Completada', CANCELLED: 'Cancelada' };
+
+function PersonalFinance({ data, monthly, independent }) {
+    const { summary, personal } = data;
+    const rates = personal.appliedRates.map(rate => percentage(rate * 100));
+    return <div className="space-y-4">
+        <dl className="grid grid-cols-2 gap-2.5 xl:grid-cols-4">
+            <Metric dark label="Mis ganancias" value={money(summary.barberEarnings)} detail="Por citas completadas" />
+            <Metric label="Ventas completadas" value={money(summary.totalRevenue)} />
+            <Metric label="Mis citas" value={summary.scheduled} detail={summary.completed + ' completadas · ' + summary.cancelled + ' canceladas'} />
+            <Metric label={independent ? 'Mi participación' : 'Comisión vigente'} value={percentage(personal.commissionRate * 100)}
+                detail={rates.length ? 'Porcentajes aplicados en el período: ' + rates.join(', ') : undefined} />
+        </dl>
+        {summary.estimated > 0 && <p className="text-sm text-stone-600">El período incluye {summary.estimated} citas calculadas con la configuración vigente.</p>}
+        <SalesChart points={data.chart} monthly={monthly} />
+        <Section title="Mis citas del período">
+            <Table headers={['Servicio', 'Fecha', 'Hora', 'Estado']}
+                rows={personal.appointments.map(row => [row.id, row.service, appointmentDate.format(new Date(row.date)), row.timeSlot, appointmentLabels[row.state]])} />
+        </Section>
+    </div>;
+}
+
+export default function FinanceDashboard({ today, personal, independent }) {
     const [localYear, localMonth] = today.split('-');
     const [tab, setTab] = useState('reports');
     const [period, setPeriod] = useState('monthly');
@@ -277,13 +300,13 @@ export default function FinanceDashboard({ today }) {
     return <div className="mx-auto max-w-6xl space-y-4 pb-12">
         <header className={panel + ' space-y-4'}>
             <div className="flex flex-wrap items-center justify-between gap-3">
-                <h1 className="flex items-center gap-2.5 text-2xl font-bold"><BarChart3 size={23} /> Contabilidad y Finanzas</h1>
-                <div className="flex gap-1 rounded-xl bg-stone-100 p-1" aria-label="Sección de finanzas">
+                <h1 className="flex items-center gap-2.5 text-2xl font-bold"><BarChart3 size={23} /> {personal ? 'Mi contabilidad' : 'Contabilidad y Finanzas'}</h1>
+                {!personal && <div className="flex gap-1 rounded-xl bg-stone-100 p-1" aria-label="Sección de finanzas">
                     {[['reports', 'Reportes'], ['accounting', 'Contabilidad']].map(([value, label]) =>
                         <button key={value} type="button" onClick={() => { setTab(value); setNotice(''); }} aria-pressed={tab === value}
                             className={'rounded-lg px-3 py-2 text-sm font-semibold ' + (tab === value ? 'bg-white text-black shadow-sm' : 'text-stone-700 hover:bg-white/60')}>{label}</button>
                     )}
-                </div>
+                </div>}
             </div>
             <div className="grid grid-cols-2 gap-2.5 sm:grid-cols-3">
                 <label className="space-y-1 text-xs font-semibold text-stone-700">Período
@@ -311,7 +334,7 @@ export default function FinanceDashboard({ today }) {
         {current?.error && <div role="alert" className={panel + ' flex flex-wrap justify-between gap-2 text-rose-800'}>{current.error}
             <button type="button" className={neutral} onClick={() => setRefresh(value => value + 1)}>Reintentar</button></div>}
         {notice && <p role="status" className="rounded-lg bg-emerald-50 p-3 text-sm text-emerald-900">{notice}</p>}
-        {current?.data && <>
+        {current?.data && (personal ? <PersonalFinance key={query} data={current.data} monthly={monthly} independent={independent} /> : <>
             <dl className="grid grid-cols-2 gap-2.5 xl:grid-cols-4">
                 <Metric dark label="Ventas completadas" value={money(current.data.summary.totalRevenue)} detail="Precio guardado al reservar" />
                 <Metric label="Neto del negocio" value={money(current.data.summary.businessNet)} detail="Después de comisiones, antes de otros gastos" />
@@ -321,7 +344,7 @@ export default function FinanceDashboard({ today }) {
             </dl>
             {tab === 'reports' ? <Reports key={query} data={current.data} monthly={monthly} /> :
                 <Accounting data={current.data} monthly={monthly} onConfigure={row => { setEditing(row); setFormError(''); setNotice(''); }} />}
-        </>}
+        </>)}
         {editing && <SettingsForm key={editing.id} row={editing} busy={busy} error={formError}
             onClose={() => setEditing(null)} onSave={saveSettings} />}
     </div>;
