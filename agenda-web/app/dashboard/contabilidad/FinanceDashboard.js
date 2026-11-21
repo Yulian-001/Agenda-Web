@@ -243,8 +243,10 @@ function PersonalFinance({ data, monthly, independent }) {
     </div>;
 }
 
-export default function FinanceDashboard({ today, personal, independent }) {
+export default function FinanceDashboard({ today, personalOnly, canSwitch, independent }) {
     const [localYear, localMonth] = today.split('-');
+    const [scope, setScope] = useState('team');
+    const personal = personalOnly || (canSwitch && scope === 'personal');
     const [tab, setTab] = useState('reports');
     const [period, setPeriod] = useState('monthly');
     const [year, setYear] = useState(localYear);
@@ -258,7 +260,7 @@ export default function FinanceDashboard({ today, personal, independent }) {
     const [notice, setNotice] = useState('');
     const monthly = period === 'monthly';
     const validYear = /^\d{4}$/.test(year) && Number(year) >= 1900 && Number(year) <= 9998;
-    const query = validYear ? new URLSearchParams({ period, year, ...(monthly ? { month } : { semester }) }).toString() : '';
+    const query = validYear ? new URLSearchParams({ period, year, ...(personal && { view: 'personal' }), ...(monthly ? { month } : { semester }) }).toString() : '';
     const current = snapshot?.query === query && snapshot?.refresh === refresh ? snapshot : null;
 
     useEffect(() => {
@@ -308,6 +310,11 @@ export default function FinanceDashboard({ today, personal, independent }) {
                     )}
                 </div>}
             </div>
+            {canSwitch && <div className="flex flex-wrap gap-2" aria-label="Alcance de contabilidad">
+                {[['team', 'Equipo'], ['personal', 'Mis finanzas']].map(([value, label]) => <button key={value} type="button"
+                    disabled={busy} onClick={() => { setScope(value); setEditing(null); setNotice(''); }} aria-pressed={scope === value}
+                    className={scope === value ? primary : neutral}>{label}</button>)}
+            </div>}
             <div className="grid grid-cols-2 gap-2.5 sm:grid-cols-3">
                 <label className="space-y-1 text-xs font-semibold text-stone-700">Período
                     <select value={period} onChange={event => setPeriod(event.target.value)} className={control}>

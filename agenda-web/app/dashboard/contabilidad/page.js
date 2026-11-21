@@ -14,5 +14,5 @@ export default async function ContabilidadPage() {
         throw error;
     }
     const [today] = scheduleNow();
-    return <FinanceDashboard today={today} personal={!financeRoles.includes(user.role)} independent={user.role === 'BARBER_INDEPENDENT'} />;
+    return <FinanceDashboard today={today} personalOnly={!financeRoles.includes(user.role)} canSwitch={user.role === 'BARBER_BOSS'} independent={user.role === 'BARBER_INDEPENDENT'} />;
 }

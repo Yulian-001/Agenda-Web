@@ -39,6 +39,7 @@ function BarberForm({ barber, catalog, viewerId, viewerRole, pending, error, onC
         commissionRate: barber.commissionRate, haveWhatsApp: barber.haveWhatsApp,
         services: barber.services.map(({ service }) => service.id)
     } : newBarber);
+    const canSetCommission = form.role !== 'ADMIN' && !(editing && viewerRole === 'BARBER_BOSS' && barber.id === viewerId);
     const [readyPhoto, setReadyPhoto] = useState(null);
     const [processingPhoto, setProcessingPhoto] = useState(false);
     const [photoError, setPhotoError] = useState('');
@@ -62,7 +63,9 @@ function BarberForm({ barber, catalog, viewerId, viewerRole, pending, error, onC
             setPhotoError(form.photo ? 'Usa una foto que se pueda ver en la vista previa.' : 'Agrega la foto del barbero para continuar.');
             return;
         }
-        onSave(form, barber?.id);
+        const payload = { ...form };
+        if (!canSetCommission) delete payload.commissionRate;
+        onSave(payload, barber?.id);
     }
 
     return (
@@ -105,10 +108,10 @@ function BarberForm({ barber, catalog, viewerId, viewerRole, pending, error, onC
                                         .map(([value, label]) => <option key={value} value={value}>{label}</option>)}
                                 </select>
                             </label>
-                            <label className="block text-sm font-semibold text-gray-600">
+                            {canSetCommission && <label className="block text-sm font-semibold text-gray-600">
                                 Comisión ({Math.round(form.commissionRate * 100)} %)
                                 <input className="mt-3 w-full accent-black" type="range" min={0} max={1} step={0.01} value={form.commissionRate} onChange={event => setField('commissionRate', event.target.valueAsNumber)} />
-                            </label>
+                            </label>}
                         </div>
                         <label className="flex items-center gap-2 text-sm text-gray-700">
                             <input type="checkbox" checked={form.haveWhatsApp} onChange={event => setField('haveWhatsApp', event.target.checked)} />
@@ -263,7 +266,7 @@ export default function BarberosPage() {
                             </div>
                         </div>
                         <dl className="space-y-3 bg-gray-50/50 p-6 text-sm">
-                            <div className="flex justify-between gap-4"><dt className="text-gray-600">Comisión</dt><dd className="font-bold text-green-700">{Math.round(barber.commissionRate * 100)} %</dd></div>
+                            {barber.role !== 'ADMIN' && <div className="flex justify-between gap-4"><dt className="text-gray-600">Comisión</dt><dd className="font-bold text-green-700">{Math.round(barber.commissionRate * 100)} %</dd></div>}
                             <div className="flex justify-between gap-4"><dt className="text-gray-600">Servicios asignados</dt><dd className="text-right font-semibold text-gray-800">{barber.services.map(({ service }) => service.name).join(', ') || 'Sin servicios'}</dd></div>
                         </dl>
                         <div className="flex flex-wrap gap-2 border-t border-gray-100 p-4">

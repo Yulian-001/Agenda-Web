@@ -1,6 +1,7 @@
 import { pathToFileURL } from 'node:url';
 import { PrismaClient } from '@prisma/client';
 import bcrypt from 'bcryptjs';
+import { z } from 'zod';
 import { securePasswordMessage, securePasswordPattern } from './config/auth.js';
 
 export async function seedOwner(tx) {
@@ -11,7 +12,9 @@ export async function seedOwner(tx) {
     const password = process.env.SEED_OWNER_PASSWORD ?? '';
     const role = process.env.SEED_OWNER_ROLE ?? 'ADMIN';
     const photo = process.env.SEED_OWNER_PHOTO ?? '';
+    const email = process.env.SEED_OWNER_EMAIL?.trim().toLowerCase() || null;
     if (!/^3[0-9]{9}$/.test(phone)) throw new Error('Configura un teléfono válido en SEED_OWNER_PHONE.');
+    if (email && !z.email().max(254).safeParse(email).success) throw new Error('Configura un correo válido en SEED_OWNER_EMAIL.');
     if (!securePasswordPattern.test(password)) throw new Error(securePasswordMessage);
     if (!['ADMIN', 'BARBER_BOSS', 'BARBER_INDEPENDENT'].includes(role)) {
         throw new Error('SEED_OWNER_ROLE debe ser ADMIN, BARBER_BOSS o BARBER_INDEPENDENT.');
@@ -24,8 +27,9 @@ export async function seedOwner(tx) {
     const passwordHash = await bcrypt.hash(password, 10);
     const owner = await tx.user.create({
         data: {
-            name: process.env.SEED_OWNER_NAME ?? (role === 'ADMIN' ? 'Administrador principal' : 'Profesional titular'),
+            name: process.env.SEED_OWNER_NAME ?? (role === 'ADMIN' ? 'Administrador Dev' : 'Profesional titular'),
             phone,
+            email,
             password: passwordHash,
             role,
             photo,
@@ -51,7 +55,11 @@ if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) 
             await tx.$queryRaw`SELECT 1::int FROM (SELECT pg_advisory_xact_lock(20261121)) AS lock`;
             return seedOwner(tx);
         });
+        const owner = await prisma.user.findFirstOrThrow({
+            where: { isOwner: true }, select: { name: true, role: true, phone: true }
+        });
         console.log(created ? 'Cuenta propietaria creada.' : 'La cuenta propietaria ya existe.');
+        console.log(`${owner.name} · ${owner.role} · Usuario ${owner.phone}`);
     } catch (error) {
         console.error('No se pudo crear la cuenta propietaria:', error.message);
         process.exitCode = 1;

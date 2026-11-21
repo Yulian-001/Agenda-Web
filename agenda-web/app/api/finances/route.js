@@ -17,7 +17,8 @@ export async function GET(request) {
         const month = searchParams.get('month');
         const semester = searchParams.get('semester');
 
-        const finances = await getFinancesService(payload, { period, year, month, semester });
+        const view = searchParams.get('view');
+        const finances = await getFinancesService(payload, { period, year, month, semester, view });
 
         return NextResponse.json({
             message: "Reporte financiero generado exitosamente",

@@ -6,7 +6,7 @@ import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import {
     Menu, X, CalendarDays, CalendarCheck, User,
-    Scissors, Clock, BarChart3, LogOut
+    Scissors, Clock, BarChart3, LogOut, Mail
 } from 'lucide-react';
 import BrandLogo from './BrandLogo';
 import business from '../config/business.json';
@@ -20,6 +20,7 @@ const menuItems = [
     { name: 'Servicios', icon: Scissors, path: '/dashboard/servicios', allowedRoles: catalogManagers },
     { name: 'Agenda', icon: Clock, path: '/dashboard/agenda', allowedRoles: catalogManagers },
     { name: 'Contabilidad', icon: BarChart3, path: '/dashboard/contabilidad' },
+    { name: 'Mi correo', icon: Mail, path: '/dashboard/cuenta/correo' },
 ];
 
 function ProfileCard({ profile, onEdit }) {

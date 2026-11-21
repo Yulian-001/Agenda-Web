@@ -31,7 +31,7 @@ export const getBarbersService = viewerId => prisma.user.findMany({
 async function lockBarber(tx, id, teamOnly) {
     // Coordina las bajas con las reservas en curso y los cambios de perfil.
     const [barber] = await tx.$queryRaw`
-        SELECT "role", "photo", "isOwner" FROM "User" WHERE "id" = ${id} AND "archivedAt" IS NULL FOR UPDATE
+        SELECT "role", "photo", "isOwner", "commissionRate" FROM "User" WHERE "id" = ${id} AND "archivedAt" IS NULL FOR UPDATE
     `;
     if (!barber || (teamOnly && !Object.hasOwn(teamBarberRoles, barber.role))) {
         throw { statusCode: 404, message: 'Usuario no encontrado' };
@@ -61,6 +61,10 @@ export async function getServiceAssignments(tx, serviceIds) {
 export const updateBarberService = (id, data, teamOnly, actor) => prisma.$transaction(async tx => {
     const barber = await lockBarber(tx, id, teamOnly);
     const { services, ...profile } = data;
+    if (profile.commissionRate !== undefined && profile.commissionRate !== barber.commissionRate &&
+        ((profile.role ?? barber.role) === 'ADMIN' || (actor.role === 'BARBER_BOSS' && actor.id === id))) {
+        throw { statusCode: 403, message: 'Esta cuenta no permite modificar la comisión desde tu perfil.' };
+    }
     if (profile.role && profile.role !== barber.role) {
         if (actor.role === 'BARBER_BOSS' && barber.role === 'ADMIN') {
             throw { statusCode: 403, message: adminProtection };

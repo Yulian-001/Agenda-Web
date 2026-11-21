@@ -50,6 +50,7 @@ export const dailyScheduleSchema = z.object({
 ) && (data.wholeDay !== undefined || Object.keys(data.hours).length > 0), 'Selecciona horas o una opción para todo el día.');
 
 export const createAppointmentSchema = z.object({
+    clientEmail: z.string().trim().email('Ingresa un correo válido para recibir la reserva.').max(254).transform(email => email.toLowerCase()),
     clientName: z.string().min(2, "El nombre es requerido").trim(),
     clientPhone: z.string().length(10, "El teléfono debe tener 10 dígitos").trim(),
     barberId: z.string().uuid("ID de barbero inválido"),

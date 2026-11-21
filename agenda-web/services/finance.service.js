@@ -91,8 +91,12 @@ function weekOf(date) {
 export const getFinancesService = async (user, filters) => {
     const [today] = scheduleNow();
     const period = resolvePeriod(filters, today);
-    const team = financeRoles.includes(user.role);
-    const scope = team ? { barber: { role: { not: 'BARBER_INDEPENDENT' } } } : { barberId: user.id };
+    const team = financeRoles.includes(user.role) && (user.role === 'ADMIN' || filters.view !== 'personal');
+    const teamBarbers = {
+        role: { in: ['BARBER_BOSS', 'BARBER_AFFILIATE'] },
+        ...(user.role === 'BARBER_BOSS' && { id: { not: user.id } })
+    };
+    const scope = team ? { barber: teamBarbers } : { barberId: user.id };
     const barberSelect = { id: true, name: true, role: true, commissionRate: true, settlementDirection: true, archivedAt: true, state: true };
     const [appointments, profiles, lifetime, catalog, clientSanctions] = await Promise.all([
         prisma.appointment.findMany({
@@ -111,8 +115,7 @@ export const getFinancesService = async (user, filters) => {
         }),
         prisma.user.findMany({
             where: team ? {
-                role: { not: 'BARBER_INDEPENDENT' }, archivedAt: null,
-                OR: [{ isOwner: false }, { role: { not: 'ADMIN' } }, { id: user.id }]
+                ...teamBarbers, archivedAt: null
             } : { id: user.id },
             select: barberSelect
         }),
@@ -254,13 +257,16 @@ export const getFinancesService = async (user, filters) => {
     };
 };
 
-export async function updateSettlementSettings(id, data) {
+export async function updateSettlementSettings(id, data, actor) {
     if (!Object.hasOwn(settlementDirections, data.settlementDirection)) {
         throw { statusCode: 400, message: 'Selecciona una modalidad de liquidación válida.' };
     }
     try {
         return await prisma.user.update({
-            where: { id, archivedAt: null, role: { not: 'BARBER_INDEPENDENT' } },
+            where: {
+                id, archivedAt: null, role: { in: ['BARBER_BOSS', 'BARBER_AFFILIATE'] },
+                ...(actor.role === 'BARBER_BOSS' && { NOT: { id: actor.id } })
+            },
             data,
             select: { id: true, name: true, commissionRate: true, settlementDirection: true }
         });

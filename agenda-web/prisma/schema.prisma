@@ -35,6 +35,11 @@ model User {
     id String @id @default(uuid())
     name String
     phone String @unique
+    email String? @unique
+    emailVerifiedAt DateTime?
+    pendingEmail String?
+    emailChangeDigest String? @unique
+    emailChangeExpiresAt DateTime?
     password String
     role Role 
     photo String
@@ -91,6 +96,8 @@ model Appointment {
     date DateTime
     timeSlot String 
     state AppointmentState @default(PENDING)
+    clientEmail String?
+    clientConfirmedAt DateTime?
     priceAtBooking Float 
     commissionRateApplied Float?
     settlementDirectionApplied String?
@@ -188,4 +195,17 @@ model RecoveryRateLimit {
     expiresAt DateTime
 
     @@index([expiresAt])
+}
+
+model EmailJob {
+    id          String    @id @default(uuid())
+    kind        String
+    payload     String
+    runAt       DateTime
+    expiresAt   DateTime
+    attempts    Int       @default(0)
+    lease       String?
+    lockedUntil DateTime?
+
+    @@index([runAt])
 }

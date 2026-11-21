@@ -68,6 +68,7 @@ function AppointmentCard({ appointment, onOpen }) {
                     <p>{dateFormat.format(new Date(appointment.date))}</p>
                 </div>
             </div>
+            {appointment.state === 'CONFIRMED' && appointment.clientConfirmedAt && <p className="text-xs font-semibold text-emerald-800">Asistencia confirmada por el cliente</p>}
             {appointment.state === 'CANCELLED' && <Cancellation data={appointment.cancellation} />}
             <button type="button" onClick={onOpen} aria-label={'Abrir cita de ' + appointment.clientName + ' a las ' + appointment.timeSlot}
                 className="absolute inset-0 cursor-pointer rounded-2xl focus:outline-none hover:ring-1 hover:ring-stone-400" />
@@ -106,7 +107,8 @@ function AppointmentDialog({ appointment, onClose, onChangeState, busy, error })
                 <div className="flex justify-between gap-3"><dt className="text-stone-600">Hora</dt><dd className="text-right font-semibold">{appointment.timeSlot}</dd></div>
             </dl>
             <div className="mt-4 space-y-3">
-                {appointment.state === 'CANCELLED' && <Cancellation data={appointment.cancellation} />}
+                {appointment.state === 'CONFIRMED' && appointment.clientConfirmedAt && <p className="text-xs font-semibold text-emerald-800">Asistencia confirmada por el cliente</p>}
+            {appointment.state === 'CANCELLED' && <Cancellation data={appointment.cancellation} />}
                 {error && <p role="alert" className="rounded-xl bg-rose-50 p-3 text-sm text-rose-900">{error}</p>}
                 {appointment.state === 'PENDING' && <button type="button" disabled={busy} onClick={() => onChangeState('CONFIRMED')}
                     className="min-h-11 w-full rounded-xl bg-brand-primary px-3 py-2 text-sm font-semibold text-brand-on-primary disabled:opacity-50">Confirmar cita</button>}
